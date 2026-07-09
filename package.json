@@ -1,0 +1,90 @@
+{
+  "name": "dev-activity-tracker",
+  "displayName": "Developer Activity & Coding Analytics",
+  "description": "Automatically tracks coding, reading, debugging, git operations, and terminal usage with local-first detailed analytics and a premium interactive dashboard.",
+  "version": "1.0.0",
+  "publisher": "jeem-labs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeem-labs/dev-activity-tracker.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "dev-activity-tracker.showDashboard",
+        "title": "Developer Activity: Show Analytics Dashboard",
+        "category": "Developer Activity"
+      },
+      {
+        "command": "dev-activity-tracker.exportData",
+        "title": "Developer Activity: Export Analytics Data",
+        "category": "Developer Activity"
+      },
+      {
+        "command": "dev-activity-tracker.backupData",
+        "title": "Developer Activity: Backup Data",
+        "category": "Developer Activity"
+      },
+      {
+        "command": "dev-activity-tracker.restoreData",
+        "title": "Developer Activity: Restore Data",
+        "category": "Developer Activity"
+      }
+    ],
+    "configuration": {
+      "title": "Developer Activity Tracker",
+      "properties": {
+        "devActivityTracker.idleTimeout": {
+          "type": "integer",
+          "default": 300,
+          "enum": [60, 180, 300, 600, 900],
+          "enumDescriptions": [
+            "1 Minute",
+            "3 Minutes",
+            "5 Minutes",
+            "10 Minutes",
+            "15 Minutes"
+          ],
+          "description": "Idle timeout in seconds (when tracking will pause)."
+        },
+        "devActivityTracker.dailyGoal": {
+          "type": "integer",
+          "default": 14400,
+          "description": "Daily development time goal in seconds (default is 4 hours)."
+        },
+        "devActivityTracker.privacyMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Privacy Mode: If true, obscure specific file names and workspace paths in logs."
+        },
+        "devActivityTracker.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show activity status in the status bar."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  }
+}

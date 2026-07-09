@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Activity & Productivity Analytics</title>
+  <link rel="stylesheet" id="style-link" href="">
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <h1 id="dashboard-title">Developer Activity Tracker</h1>
+        <p id="dashboard-subtitle">Quietly tracking your coding productivity</p>
+      </div>
+      <div class="controls">
+        <select id="time-range-select">
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7days">Last 7 Days</option>
+          <option value="30days">Last 30 Days</option>
+          <option value="thisMonth" selected>This Month</option>
+          <option value="lifetime">Lifetime</option>
+        </select>
+        <button class="btn" id="export-btn">
+          <span>📤</span> Export Statistics
+        </button>
+      </div>
+    </header>
+
+    <!-- Overview Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card primary">
+        <h3>Development Time</h3>
+        <div class="value" id="dev-time-value">0h 0m</div>
+        <div class="subtext" id="dev-time-subtext">Total time active in VS Code</div>
+        <div class="icon">💻</div>
+      </div>
+      <div class="metric-card secondary">
+        <h3>Coding Time</h3>
+        <div class="value" id="coding-time-value">0h 0m</div>
+        <div class="subtext" id="coding-time-subtext">Active typing & editing</div>
+        <div class="icon">⚡</div>
+      </div>
+      <div class="metric-card accent">
+        <h3>Current Streak</h3>
+        <div class="value" id="streak-value">0 Days</div>
+        <div class="subtext" id="streak-subtext">Daily active consistency</div>
+        <div class="icon">🔥</div>
+      </div>
+      <div class="metric-card success">
+        <h3>Active Projects</h3>
+        <div class="value" id="projects-value">0</div>
+        <div class="subtext" id="projects-subtext">Workspaces tracked</div>
+        <div class="icon">📁</div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <h2>Coding Heatmap</h2>
+        <div class="legend" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);">
+          <span>Less</span>
+          <div class="level-0" style="width: 10px; height: 10px; border-radius: 2px;"></div>
+          <div class="level-1" style="width: 10px; height: 10px; border-radius: 2px;"></div>
+          <div class="level-2" style="width: 10px; height: 10px; border-radius: 2px;"></div>
+          <div class="level-3" style="width: 10px; height: 10px; border-radius: 2px;"></div>
+          <div class="level-4" style="width: 10px; height: 10px; border-radius: 2px;"></div>
+          <span>More</span>
+        </div>
+      </div>
+      <div class="heatmap-container">
+        <div class="heatmap-grid" id="heatmap-grid">
+          <!-- Populated by javascript -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Analytics Content -->
+    <div class="layout-row">
+      <!-- Left Column: Activity Breakdown and Goal Tracker -->
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h2>Activity Classification</h2>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: center;">
+            <div class="goal-ring-container">
+              <svg class="progress-ring" width="120" height="120">
+                <circle class="progress-ring-track" stroke="rgba(255,255,255,0.06)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                <circle class="progress-ring-circle" id="goal-progress-ring" stroke="var(--color-primary)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60" stroke-linecap="round"/>
+              </svg>
+              <div class="goal-info">
+                <h4 id="goal-percentage">0%</h4>
+                <p id="goal-progress-text">0h / 4h Goal</p>
+              </div>
+            </div>
+            <div class="breakdown-list" id="category-breakdown-list">
+              <!-- Category items -->
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h2>Programming Languages</h2>
+          </div>
+          <div class="table-list" id="languages-table-list">
+            <!-- Language rows -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Projects & Branches -->
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="chart-card" style="flex: 1;">
+          <div class="chart-card-header">
+            <h2>Workspace Breakdown</h2>
+          </div>
+          <div class="table-list" id="projects-table-list">
+            <!-- Project rows -->
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h2>Terminal & AI Usage</h2>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 16px; padding: 8px 0;">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary); font-size: 14px;">Terminal Active Time</span>
+              <strong id="terminal-active-time">0m</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary); font-size: 14px;">Commands Executed</span>
+              <strong id="terminal-commands-count">0</strong>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--card-border);">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary); font-size: 14px;">AI Active Time</span>
+              <strong id="ai-active-time">0m</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary); font-size: 14px;">AI Code Assistance</span>
+              <strong id="ai-percentage">0%</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History / Files / Settings Tabs -->
+    <div class="chart-card">
+      <div class="tabs-container">
+        <button class="tab-btn active" data-tab="tab-timeline">Activity History</button>
+        <button class="tab-btn" data-tab="tab-files">File Analytics</button>
+        <button class="tab-btn" data-tab="tab-settings">System Settings</button>
+      </div>
+
+      <!-- Timeline Tab -->
+      <div class="tab-content active" id="tab-timeline">
+        <div class="timeline-list" id="timeline-list">
+          <!-- Timeline events -->
+        </div>
+      </div>
+
+      <!-- Files Tab -->
+      <div class="tab-content" id="tab-files">
+        <div style="margin-bottom: 16px;">
+          <input type="text" id="file-search-input" placeholder="🔍 Search file paths..." style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary); padding: 10px 16px; border-radius: 12px; font-size: 14px; width: 100%; max-width: 320px; outline: none;">
+        </div>
+        <div class="table-list" id="files-table-list" style="max-height: 400px;">
+          <!-- File rows -->
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-content" id="tab-settings">
+        <form class="settings-form" id="settings-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="setting-idle-timeout">Idle Timeout</label>
+            <select id="setting-idle-timeout">
+              <option value="60">1 Minute</option>
+              <option value="180">3 Minutes</option>
+              <option value="300" selected>5 Minutes</option>
+              <option value="600">10 Minutes</option>
+              <option value="900">15 Minutes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="setting-daily-goal">Daily Time Goal (Hours)</label>
+            <input type="number" id="setting-daily-goal" min="1" max="24" value="4">
+          </div>
+          <div class="form-group-row">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="setting-privacy-mode" style="font-size: 14px;">Privacy Mode</label>
+              <span style="font-size: 11px; color: var(--text-secondary);">Mask project and file names in database</span>
+            </div>
+            <input type="checkbox" id="setting-privacy-mode" style="width: 20px; height: 20px; cursor: pointer;">
+          </div>
+          <div class="form-group-row">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="setting-show-statusbar" style="font-size: 14px;">Status Bar Indicator</label>
+              <span style="font-size: 11px; color: var(--text-secondary);">Show session duration and status in VS Code</span>
+            </div>
+            <input type="checkbox" id="setting-show-statusbar" checked style="width: 20px; height: 20px; cursor: pointer;">
+          </div>
+          <div style="grid-column: 1 / -1; display: flex; gap: 12px; margin-top: 16px;">
+            <button class="btn btn-primary" id="save-settings-btn">Save Configurations</button>
+            <button class="btn" id="backup-btn">Backup Now</button>
+            <button class="btn" id="restore-btn">Restore Backup</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip" style="display: none;"></div>
+
+  <script id="script-link" src=""></script>
+</body>
+</html>

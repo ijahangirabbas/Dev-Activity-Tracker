@@ -1,0 +1,28 @@
+# Dependency directories
+node_modules/
+
+# Build and compilation outputs
+dist/
+out/
+dist-tests/
+src/**/*.js
+src/**/*.js.map
+src/tests/unitTests.js
+src/tests/demoServer.js
+
+# VS Code test caches
+.vscode-test/
+
+# Packaged extension files
+*.vsix
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Local databases/configurations (if any local temp runs exist)
+*.tmp
+db.json
+backups/
