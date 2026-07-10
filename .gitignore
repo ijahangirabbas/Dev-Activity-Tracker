@@ -26,3 +26,6 @@ Desktop.ini
 *.tmp
 db.json
 backups/
+
+# VS Code local workspace configurations
+.vscode/
