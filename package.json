@@ -4,17 +4,38 @@
   "description": "Automatically tracks coding, reading, debugging, git operations, and terminal usage with local-first detailed analytics and a premium interactive dashboard.",
   "version": "1.0.0",
   "publisher": "jeem-labs",
+  "icon": "icon.png",
+  "keywords": [
+    "productivity",
+    "analytics",
+    "time tracking",
+    "coding stats",
+    "developer",
+    "activity",
+    "git",
+    "terminal",
+    "AI",
+    "heatmap",
+    "wakatime",
+    "dashboard"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/jeem-labs/dev-activity-tracker.git"
+    "url": "https://github.com/ijahangirabbas/Dev-Activity-Tracker.git"
   },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
   "activationEvents": [
+    "onCommand:dev-activity-tracker.showDashboard",
+    "onCommand:dev-activity-tracker.exportData",
+    "onCommand:dev-activity-tracker.backupData",
+    "onCommand:dev-activity-tracker.restoreData",
+    "onCommand:dev-activity-tracker.syncToCloud",
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
@@ -39,6 +60,11 @@
         "command": "dev-activity-tracker.restoreData",
         "title": "Developer Activity: Restore Data",
         "category": "Developer Activity"
+      },
+      {
+        "command": "dev-activity-tracker.syncToCloud",
+        "title": "Developer Activity: Sync Data to Cloud (Supabase)",
+        "category": "Developer Activity"
       }
     ],
     "configuration": {
@@ -47,7 +73,13 @@
         "devActivityTracker.idleTimeout": {
           "type": "integer",
           "default": 300,
-          "enum": [60, 180, 300, 600, 900],
+          "enum": [
+            60,
+            180,
+            300,
+            600,
+            900
+          ],
           "enumDescriptions": [
             "1 Minute",
             "3 Minutes",
@@ -71,6 +103,21 @@
           "type": "boolean",
           "default": true,
           "description": "Show activity status in the status bar."
+        },
+        "devActivityTracker.supabaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Your Supabase project URL (e.g. https://xxxx.supabase.co). Required for cloud dashboard sync."
+        },
+        "devActivityTracker.supabaseServiceKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Supabase service_role API key. Used to write data from the extension. Keep this private."
+        },
+        "devActivityTracker.supabaseUserId": {
+          "type": "string",
+          "default": "",
+          "description": "Your Supabase Auth user ID (UUID). Found in Supabase → Authentication → Users after you register."
         }
       }
     }
@@ -82,9 +129,9 @@
     "package": "node esbuild.js --production"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.11.0",
-    "esbuild": "^0.20.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.3.3"
   }
 }

@@ -212,7 +212,7 @@ const server = http.createServer((req, res) => {
   const decodedUrl = decodeURIComponent(req.url || '');
   
   if (decodedUrl === '/' || decodedUrl === '/index.html') {
-    const htmlPath = path.join(__dirname, '..', 'views', 'dashboard.html');
+    const htmlPath = path.join(__dirname, '..', '..', 'views', 'dashboard.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
 
     // Replace CSS and JS links to relative server paths
@@ -250,11 +250,11 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
   } else if (decodedUrl === '/dashboard.css') {
-    const cssPath = path.join(__dirname, '..', 'views', 'dashboard.css');
+    const cssPath = path.join(__dirname, '..', '..', 'views', 'dashboard.css');
     res.writeHead(200, { 'Content-Type': 'text/css' });
     res.end(fs.readFileSync(cssPath, 'utf8'));
   } else if (decodedUrl === '/dashboard.js') {
-    const jsPath = path.join(__dirname, '..', 'views', 'dashboard.js');
+    const jsPath = path.join(__dirname, '..', '..', 'views', 'dashboard.js');
     res.writeHead(200, { 'Content-Type': 'application/javascript' });
     res.end(fs.readFileSync(jsPath, 'utf8'));
   } else {

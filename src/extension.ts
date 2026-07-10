@@ -4,9 +4,11 @@ import { Tracker } from './tracking/tracker';
 import { StatusbarManager } from './statusbar/statusbar';
 import { registerCommands } from './commands';
 import { DashboardPanel } from './webview/dashboardPanel';
+import { LocalServer } from './services/localServer';
 
 let tracker: Tracker | undefined;
 let statusBarManager: StatusbarManager | undefined;
+let localServer: LocalServer | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Developer Activity & Coding Analytics extension activated.');
@@ -14,6 +16,15 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize storage
   const storagePath = context.globalStorageUri.fsPath;
   const dbService = new DatabaseService(storagePath);
+
+  // Start local API server for dashboard web client integrations
+  localServer = new LocalServer(dbService, () => {
+    if (tracker) {
+      return tracker.getLiveDatabase();
+    }
+    return dbService.getDatabase();
+  });
+  localServer.start();
 
   // Initialize status bar manager
   statusBarManager = new StatusbarManager(dbService);
@@ -49,6 +60,9 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   console.log('Developer Activity & Coding Analytics extension deactivating...');
   
+  if (localServer) {
+    localServer.stop();
+  }
   if (tracker) {
     tracker.deactivate();
   }

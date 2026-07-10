@@ -8,6 +8,7 @@ import { WorkspaceTracker } from '../workspace/workspaceTracker';
 import { FileTracker } from '../files/fileTracker';
 import { AITracker } from '../ai/aiTracker';
 import { LanguageTracker } from '../languages/languageTracker';
+import { SupabaseSyncService } from '../services/supabaseSync';
 import { ExtensionConfig, TerminalCommandEvent } from '../models/types';
 
 export class Tracker {
@@ -19,6 +20,7 @@ export class Tracker {
   private workspaceTracker: WorkspaceTracker;
   private fileTracker: FileTracker;
   private aiTracker: AITracker;
+  private supabaseSync: SupabaseSyncService | undefined;
 
   private disposables: vscode.Disposable[] = [];
   private tickInterval: NodeJS.Timeout | undefined;
@@ -30,17 +32,27 @@ export class Tracker {
   private lastTestingTime = 0;
   private lastTickTime = 0;
 
+  // Multi-window session tracking
+  private windowId: string;
+  private ticksCount = 0;
+
+  // Cached config — updated only on configuration change events
+  private cachedConfig: ExtensionConfig;
+
   private onStateChangedCallback?: (state: string, elapsedToday: number) => void;
 
   constructor(dbService: DatabaseService, onStateChanged?: (state: string, elapsedToday: number) => void) {
     this.dbService = dbService;
     this.onStateChangedCallback = onStateChanged;
     this.sessionManager = new SessionManager();
+    this.windowId = 'win_' + Math.random().toString(36).substring(2, 9);
 
-    const config = this.getConfig();
+    // Cache config once at startup — refreshed via updateConfig()
+    this.cachedConfig = this.readConfig();
+    this.supabaseSync = this.buildSupabaseSync(this.cachedConfig);
 
     // Initialize Idle Detector
-    this.idleDetector = new IdleDetector(config.idleTimeout, (isIdle) => {
+    this.idleDetector = new IdleDetector(this.cachedConfig.idleTimeout, (isIdle) => {
       this.handleIdleStateChange(isIdle);
     });
 
@@ -65,19 +77,32 @@ export class Tracker {
     this.startTicks();
   }
 
-  private getConfig(): ExtensionConfig {
+  // Read config from VS Code settings (called sparingly)
+  private readConfig(): ExtensionConfig {
     const config = vscode.workspace.getConfiguration('devActivityTracker');
     return {
       idleTimeout: config.get<number>('idleTimeout') || 300,
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
-      showStatusBar: config.get<boolean>('showStatusBar') || true
+      showStatusBar: config.get<boolean>('showStatusBar') || true,
+      supabaseUrl: config.get<string>('supabaseUrl') || '',
+      supabaseServiceKey: config.get<string>('supabaseServiceKey') || '',
+      supabaseUserId: config.get<string>('supabaseUserId') || ''
     };
   }
 
+  private buildSupabaseSync(config: ExtensionConfig): SupabaseSyncService | undefined {
+    if (config.supabaseUrl && config.supabaseServiceKey && config.supabaseUserId) {
+      return new SupabaseSyncService(config.supabaseUrl, config.supabaseServiceKey, config.supabaseUserId);
+    }
+    return undefined;
+  }
+
+  // Called by extension.ts on onDidChangeConfiguration
   public updateConfig(): void {
-    const config = this.getConfig();
-    this.idleDetector.updateTimeout(config.idleTimeout);
+    this.cachedConfig = this.readConfig();
+    this.idleDetector.updateTimeout(this.cachedConfig.idleTimeout);
+    this.supabaseSync = this.buildSupabaseSync(this.cachedConfig);
   }
 
   private registerVscodeListeners() {
@@ -91,10 +116,13 @@ export class Tracker {
       vscode.workspace.onDidSaveTextDocument((doc) => {
         if (doc.uri.scheme === 'file') {
           this.recordActivity('coding');
-          this.sessionManager.addTimelineEvent(`Saved file: ${this.fileTracker.getFileName(doc.uri, this.getConfig().privacyMode)}`, 'coding');
+          this.sessionManager.addTimelineEvent(
+            `Saved file: ${this.fileTracker.getFileName(doc.uri, this.cachedConfig.privacyMode)}`,
+            'coding'
+          );
         }
       }),
-      
+
       // Cursor navigation / tab selection (Reading events)
       vscode.window.onDidChangeTextEditorSelection((e) => {
         if (e.textEditor.document.uri.scheme === 'file') {
@@ -104,8 +132,10 @@ export class Tracker {
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (editor && editor.document.uri.scheme === 'file') {
           this.recordActivity('reading');
-          const config = this.getConfig();
-          this.sessionManager.addTimelineEvent(`Opened file: ${this.fileTracker.getFileName(editor.document.uri, config.privacyMode)}`, 'reading');
+          this.sessionManager.addTimelineEvent(
+            `Opened file: ${this.fileTracker.getFileName(editor.document.uri, this.cachedConfig.privacyMode)}`,
+            'reading'
+          );
         }
       }),
 
@@ -114,7 +144,6 @@ export class Tracker {
         if (state.focused) {
           this.recordActivity('reading');
         } else {
-          // Immediately trigger idle check or record inactive state
           this.handleWindowBlur();
         }
       }),
@@ -126,18 +155,43 @@ export class Tracker {
         this.recordActivity('debugging');
       }),
 
-      // Testing events
-      vscode.tests.onDidChangeTestResults(() => {
-        this.lastTestingTime = Date.now();
-        // Determine test result status
-        const latest = vscode.tests.testResults[0];
-        if (latest) {
-          // Basic success/failure mapping
-          const success = true; // Simplified for metadata logic
-          this.sessionManager.recordTestRun(success);
-          this.recordActivity('testing');
+      // Testing events (safe check for proposed testObserver/testResults APIs)
+      (() => {
+        try {
+          if (typeof vscode.tests !== 'undefined' && 'onDidChangeTestResults' in vscode.tests) {
+            this.disposables.push(
+              vscode.tests.onDidChangeTestResults(() => {
+                this.lastTestingTime = Date.now();
+                const testsNamespace = vscode.tests as any;
+                if (testsNamespace.testResults && testsNamespace.testResults.length > 0) {
+                  const latest = testsNamespace.testResults[0];
+                  let failed = 0;
+                  const countFailed = (tasks: readonly any[]) => {
+                    for (const t of tasks) {
+                      if (t.taskStates) {
+                        for (const ts of t.taskStates) {
+                          if (ts.state === 'Failed' || ts.state === 'Errored') {
+                            failed++;
+                          }
+                        }
+                      }
+                    }
+                  };
+                  countFailed(latest.results || []);
+                  this.sessionManager.recordTestRun(failed === 0);
+                  this.recordActivity('testing');
+                } else {
+                  // Fallback: just record test activity without pass/fail analysis if testResults is blocked
+                  this.sessionManager.recordTestRun(true);
+                  this.recordActivity('testing');
+                }
+              })
+            );
+          }
+        } catch (e) {
+          console.error('Error starting Test tracker:', e);
         }
-      })
+      })()
     );
   }
 
@@ -146,41 +200,28 @@ export class Tracker {
     this.idleDetector.recordActivity();
 
     switch (type) {
-      case 'coding':
-        this.lastCodingTime = now;
-        break;
-      case 'debugging':
-        // Handled via active debug sessions
-        break;
-      case 'terminal':
-        this.lastTerminalTime = now;
-        break;
-      case 'ai':
-        this.lastAITime = now;
-        break;
-      case 'git':
-        this.lastGitTime = now;
-        break;
-      case 'testing':
-        this.lastTestingTime = now;
-        break;
+      case 'coding':     this.lastCodingTime = now; break;
+      case 'terminal':   this.lastTerminalTime = now; break;
+      case 'ai':         this.lastAITime = now; break;
+      case 'git':        this.lastGitTime = now; break;
+      case 'testing':    this.lastTestingTime = now; break;
     }
   }
 
   private handleIdleStateChange(isIdle: boolean) {
     if (isIdle) {
       this.sessionManager.addTimelineEvent('Developer went idle', 'idle');
-      this.dbService.save(); // Save progress up to now
+      this.dbService.deleteActiveSession(this.windowId);
     } else {
       this.sessionManager.addTimelineEvent('Developer active', 'system');
       this.lastTickTime = Date.now();
+      this.updateActiveSessionFile();
     }
   }
 
   private handleWindowBlur() {
-    // If window blurred, register it as idle immediately
     this.sessionManager.addTimelineEvent('Window focus lost (idle)', 'idle');
-    this.dbService.save();
+    this.dbService.deleteActiveSession(this.windowId);
   }
 
   private handleGitCommit() {
@@ -193,8 +234,6 @@ export class Tracker {
     this.lastGitTime = Date.now();
     this.sessionManager.recordBranchSwitch(branch);
     this.recordActivity('git');
-    
-    // Cycle session on branch changes
     this.cycleSession();
   }
 
@@ -216,7 +255,6 @@ export class Tracker {
   }
 
   private handleWorkspaceChange() {
-    // Cycle session on workspace changes
     this.cycleSession();
   }
 
@@ -231,6 +269,20 @@ export class Tracker {
     if (this.tickInterval) {
       clearInterval(this.tickInterval);
       this.tickInterval = undefined;
+    }
+  }
+
+  private updateActiveSessionFile() {
+    const current = this.sessionManager.getCurrentSession();
+    if (current) {
+      const now = Date.now();
+      const duration = Math.round((now - current.startTime) / 1000);
+      const virtualSession = {
+        ...current,
+        duration,
+        endTime: now
+      };
+      this.dbService.writeActiveSession(this.windowId, virtualSession);
     }
   }
 
@@ -272,50 +324,57 @@ export class Tracker {
     // Track active file details
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor && activeEditor.document.uri.scheme === 'file') {
-      const config = this.getConfig();
-      const relativePath = this.fileTracker.getRelativePath(activeEditor.document.uri, config.privacyMode);
-      const fileName = this.fileTracker.getFileName(activeEditor.document.uri, config.privacyMode);
+      const relativePath = this.fileTracker.getRelativePath(activeEditor.document.uri, this.cachedConfig.privacyMode);
+      const fileName = this.fileTracker.getFileName(activeEditor.document.uri, this.cachedConfig.privacyMode);
       const languageId = LanguageTracker.getLanguageName(activeEditor.document.languageId);
-      
       const isEdit = (now - this.lastCodingTime < 1500);
-      
-      this.sessionManager.recordFileActivity(
-        relativePath,
-        fileName,
-        languageId,
-        isEdit,
-        deltaSeconds
-      );
+
+      this.sessionManager.recordFileActivity(relativePath, fileName, languageId, isEdit, deltaSeconds);
     }
 
     // Track active terminals count
     this.sessionManager.recordTerminalSessionsCount(this.terminalTracker.getTerminalSessionsCount());
 
-    // Update status bar & notify listeners
+    // Periodically update active session file (every 5 seconds / ticks)
+    this.ticksCount++;
+    if (this.ticksCount % 5 === 0) {
+      this.updateActiveSessionFile();
+    }
+
+    // Notify status bar & dashboard
     if (this.onStateChangedCallback) {
       this.onStateChangedCallback(activeState, this.getTodayAccumulatedTime());
     }
   }
 
   private startNewSession() {
-    const config = this.getConfig();
-    const ws = this.workspaceTracker.getWorkspaceDetails(config.privacyMode);
+    const ws = this.workspaceTracker.getWorkspaceDetails(this.cachedConfig.privacyMode);
     const gitDetails = this.gitTracker.getRepoDetails();
-
-    this.sessionManager.startSession(
-      ws.name,
-      ws.path,
-      gitDetails.repository,
-      gitDetails.branch
-    );
+    this.sessionManager.startSession(ws.name, ws.path, gitDetails.repository, gitDetails.branch);
     this.lastTickTime = Date.now();
+    this.updateActiveSessionFile();
   }
 
-  private endCurrentSession() {
+  private async endCurrentSession() {
     const session = this.sessionManager.endSession();
-    if (session && session.duration > 5) { // Only log meaningful sessions (> 5 seconds)
-      const config = this.getConfig();
-      this.dbService.addSession(session, config.dailyGoal);
+    if (session && session.duration > 5) {
+      this.dbService.deleteActiveSession(this.windowId);
+      this.dbService.addSession(session, this.cachedConfig.dailyGoal);
+
+      // Auto-sync to Supabase if configured
+      if (this.supabaseSync && this.supabaseSync.isConfigured()) {
+        try {
+          await this.supabaseSync.syncSession(session);
+          const db = this.dbService.getDatabase();
+          const todayStr = this.localDateString(new Date(session.startTime));
+          if (db.dailyProgress[todayStr]) {
+            await this.supabaseSync.syncDailyProgress(todayStr, db.dailyProgress[todayStr]);
+          }
+          await this.supabaseSync.syncStreaks(db.streaks);
+        } catch (e) {
+          console.error('[SupabaseSync] Auto-sync failed:', e);
+        }
+      }
     }
   }
 
@@ -324,58 +383,73 @@ export class Tracker {
     this.startNewSession();
   }
 
+  // Correct local-timezone date string
+  private localDateString(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   public getTodayAccumulatedTime(): number {
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = this.localDateString(new Date());
     const progress = this.dbService.getDatabase().dailyProgress[dateStr];
     let time = progress ? progress.developmentTime : 0;
-    
-    // Add current session's active duration
     const currentSession = this.sessionManager.getCurrentSession();
     if (currentSession) {
       time += currentSession.duration;
     }
-    
     return time;
   }
 
   public getTodayCodingTime(): number {
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = this.localDateString(new Date());
     const progress = this.dbService.getDatabase().dailyProgress[dateStr];
     let time = progress ? progress.codingTime : 0;
-
     const currentSession = this.sessionManager.getCurrentSession();
     if (currentSession) {
       time += currentSession.codingTime;
     }
-
     return time;
   }
 
   public getActiveState(): string {
-    if (this.idleDetector.isIdle()) {
-      return 'Idle';
-    }
+    if (this.idleDetector.isIdle()) { return 'Idle'; }
     const now = Date.now();
-    if (vscode.debug.activeDebugSession) {
-      return 'Debugging';
-    } else if (now - this.lastAITime < 15000) {
-      return 'AI Assisting';
-    } else if (now - this.lastTerminalTime < 30000) {
-      return 'Terminal';
-    } else if (now - this.lastGitTime < 15000) {
-      return 'Git';
-    } else if (now - this.lastTestingTime < 15000) {
-      return 'Testing';
-    } else if (now - this.lastCodingTime < 30000) {
-      return 'Coding';
-    }
+    if (vscode.debug.activeDebugSession)        { return 'Debugging'; }
+    if (now - this.lastAITime < 15000)          { return 'AI Assisting'; }
+    if (now - this.lastTerminalTime < 30000)    { return 'Terminal'; }
+    if (now - this.lastGitTime < 15000)         { return 'Git'; }
+    if (now - this.lastTestingTime < 15000)     { return 'Testing'; }
+    if (now - this.lastCodingTime < 30000)      { return 'Coding'; }
     return 'Reading';
+  }
+
+  public getLiveDatabase(): any {
+    const activeSessions = this.dbService.getActiveSessions();
+    
+    // Check if this window has a current active session and append it
+    const current = this.sessionManager.getCurrentSession();
+    if (current) {
+      const now = Date.now();
+      const duration = Math.round((now - current.startTime) / 1000);
+      const virtualSession = {
+        ...current,
+        duration,
+        endTime: now
+      };
+      
+      // Prevent duplicating our own session if it was already written to disk
+      if (!activeSessions.some((s: any) => s.id === virtualSession.id)) {
+        activeSessions.push(virtualSession);
+      }
+    }
+    
+    return this.dbService.getMergedLiveDatabase(activeSessions, this.cachedConfig.dailyGoal);
   }
 
   public deactivate() {
     this.stopTicks();
     this.idleDetector.stop();
     this.endCurrentSession();
+    this.dbService.deleteActiveSession(this.windowId);
     this.gitTracker.dispose();
     this.terminalTracker.dispose();
     this.workspaceTracker.dispose();

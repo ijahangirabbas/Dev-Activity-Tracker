@@ -10,18 +10,22 @@ export class AITracker {
   }
 
   private initAITracking() {
-    try {
-      // Listen to commands run in VS Code to detect AI actions
-      this.disposables.push(
-        vscode.commands.onDidExecuteCommand((event) => {
-          const cmd = event.command || '';
-          if (this.isAICommand(cmd)) {
-            this.onAICallback();
-          }
-        })
-      );
-    } catch (e) {
-      console.error('Error starting AI command tracker:', e);
+    if (typeof (vscode.commands as any).onDidExecuteCommand === 'function') {
+      try {
+        // Listen to commands run in VS Code to detect AI actions
+        this.disposables.push(
+          (vscode.commands as any).onDidExecuteCommand((event: any) => {
+            const cmd = event.command || '';
+            if (this.isAICommand(cmd)) {
+              this.onAICallback();
+            }
+          })
+        );
+      } catch (e) {
+        console.error('Error starting AI command tracker:', e);
+      }
+    } else {
+      console.log('AI command tracking is not supported on this VS Code version (requires proposed API).');
     }
   }
 

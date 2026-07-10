@@ -11,7 +11,7 @@
     <!-- Header -->
     <header>
       <div class="brand">
-        <h1 id="dashboard-title">Developer Activity Tracker</h1>
+        <h1 id="dashboard-title">DEVTRACKER</h1>
         <p id="dashboard-subtitle">Quietly tracking your coding productivity</p>
       </div>
       <div class="controls">
@@ -23,8 +23,11 @@
           <option value="thisMonth" selected>This Month</option>
           <option value="lifetime">Lifetime</option>
         </select>
-        <button class="btn" id="export-btn">
-          <span>📤</span> Export Statistics
+        <button class="btn btn-secondary" id="export-btn">
+          <i data-lucide="download" style="width:14px;height:14px;"></i> Export
+        </button>
+        <button class="btn btn-primary" id="sync-btn" title="Sync to Supabase Cloud">
+          <i data-lucide="cloud-upload" style="width:14px;height:14px;"></i> Sync Cloud
         </button>
       </div>
     </header>
@@ -35,25 +38,25 @@
         <h3>Development Time</h3>
         <div class="value" id="dev-time-value">0h 0m</div>
         <div class="subtext" id="dev-time-subtext">Total time active in VS Code</div>
-        <div class="icon">💻</div>
+        <div class="icon"><i data-lucide="monitor-code" style="width:28px;height:28px;"></i></div>
       </div>
       <div class="metric-card secondary">
         <h3>Coding Time</h3>
         <div class="value" id="coding-time-value">0h 0m</div>
         <div class="subtext" id="coding-time-subtext">Active typing & editing</div>
-        <div class="icon">⚡</div>
+        <div class="icon"><i data-lucide="zap" style="width:28px;height:28px;"></i></div>
       </div>
       <div class="metric-card accent">
         <h3>Current Streak</h3>
         <div class="value" id="streak-value">0 Days</div>
         <div class="subtext" id="streak-subtext">Daily active consistency</div>
-        <div class="icon">🔥</div>
+        <div class="icon"><i data-lucide="flame" style="width:28px;height:28px;"></i></div>
       </div>
       <div class="metric-card success">
         <h3>Active Projects</h3>
         <div class="value" id="projects-value">0</div>
         <div class="subtext" id="projects-subtext">Workspaces tracked</div>
-        <div class="icon">📁</div>
+        <div class="icon"><i data-lucide="folder-open" style="width:28px;height:28px;"></i></div>
       </div>
     </div>
 
@@ -128,23 +131,53 @@
           <div class="chart-card-header">
             <h2>Terminal & AI Usage</h2>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 16px; padding: 8px 0;">
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary); font-size: 14px;">Terminal Active Time</span>
-              <strong id="terminal-active-time">0m</strong>
+          <div class="terminal-ai-container">
+            <!-- Terminal Usage Section -->
+            <div class="terminal-ai-section">
+              <div class="terminal-ai-row">
+                <div class="row-label-group">
+                  <div class="icon-badge terminal-badge">
+                    <i data-lucide="terminal" style="width:14px;height:14px;"></i>
+                  </div>
+                  <span class="usage-label">Terminal Active Time</span>
+                </div>
+                <div class="row-value-group">
+                  <span class="pulse-indicator terminal-pulse" title="Active"></span>
+                  <strong id="terminal-active-time">0m</strong>
+                </div>
+              </div>
+              <div class="terminal-ai-row secondary-row">
+                <span class="usage-sublabel">Commands Executed</span>
+                <div class="row-value-group">
+                  <div class="mini-trend positive" id="terminal-trend"><i data-lucide="trending-up" style="width:10px;height:10px;"></i> active</div>
+                  <strong id="terminal-commands-count" class="muted-metric">0</strong>
+                </div>
+              </div>
             </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary); font-size: 14px;">Commands Executed</span>
-              <strong id="terminal-commands-count">0</strong>
-            </div>
-            <hr style="border: 0; border-top: 1px solid var(--card-border);">
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary); font-size: 14px;">AI Active Time</span>
-              <strong id="ai-active-time">0m</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-secondary); font-size: 14px;">AI Code Assistance</span>
-              <strong id="ai-percentage">0%</strong>
+            
+            <div class="widget-divider"></div>
+            
+            <!-- AI Usage Section -->
+            <div class="terminal-ai-section">
+              <div class="terminal-ai-row">
+                <div class="row-label-group">
+                  <div class="icon-badge ai-badge">
+                    <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                  </div>
+                  <span class="usage-label">AI Active Time</span>
+                </div>
+                <div class="row-value-group">
+                  <span class="pulse-indicator ai-pulse" title="Active"></span>
+                  <strong id="ai-active-time">0m</strong>
+                </div>
+              </div>
+              <div class="terminal-ai-row secondary-row">
+                <span class="usage-sublabel">AI Code Assistance</span>
+                <div class="row-value-group">
+                  <div class="mini-trend neutral" id="ai-trend">stable</div>
+                  <strong id="ai-percentage" class="muted-metric">0%</strong>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -169,7 +202,7 @@
       <!-- Files Tab -->
       <div class="tab-content" id="tab-files">
         <div style="margin-bottom: 16px;">
-          <input type="text" id="file-search-input" placeholder="🔍 Search file paths..." style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary); padding: 10px 16px; border-radius: 12px; font-size: 14px; width: 100%; max-width: 320px; outline: none;">
+          <input type="text" id="file-search-input" placeholder="Search file paths..." style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-primary); padding: 10px 16px; border-radius: 12px; font-size: 14px; width: 100%; max-width: 320px; outline: none;">
         </div>
         <div class="table-list" id="files-table-list" style="max-height: 400px;">
           <!-- File rows -->
@@ -220,5 +253,8 @@
   <div class="tooltip" id="tooltip" style="display: none;"></div>
 
   <script id="script-link" src=""></script>
+  <!-- Lucide Icons - Professional SVG icon library -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>if(typeof lucide !== 'undefined') lucide.createIcons();</script>
 </body>
 </html>

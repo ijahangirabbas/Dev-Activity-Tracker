@@ -1,6 +1,19 @@
 import * as vscode from 'vscode';
 import { DatabaseService } from '../storage/database';
 
+// VS Code Codicons — professional built-in vector icons
+// Full list at: https://microsoft.github.io/vscode-codicons/dist/codicon.html
+const STATE_ICONS: Record<string, string> = {
+  'coding':       '$(code)',
+  'reading':      '$(eye)',
+  'debugging':    '$(bug)',
+  'terminal':     '$(terminal)',
+  'git':          '$(git-commit)',
+  'testing':      '$(beaker)',
+  'ai assisting': '$(sparkle)',
+  'idle':         '$(clock)',
+};
+
 export class StatusbarManager {
   private statusBarItem: vscode.StatusBarItem;
   private dbService: DatabaseService;
@@ -12,7 +25,7 @@ export class StatusbarManager {
       100
     );
     this.statusBarItem.command = 'dev-activity-tracker.showDashboard';
-    this.statusBarItem.tooltip = 'Developer Activity Analytics - Click to open Dashboard';
+    this.statusBarItem.tooltip = 'Developer Activity Analytics — Click to open Dashboard';
     this.update('Reading', 0);
     this.statusBarItem.show();
   }
@@ -28,35 +41,14 @@ export class StatusbarManager {
 
     const hours = Math.floor(secondsToday / 3600);
     const minutes = Math.floor((secondsToday % 3600) / 60);
-    const streak = this.dbService.getDatabase().streaks.development.currentStreak;
+    const streak = this.dbService.getDatabase().streaks?.development?.currentStreak || 0;
 
-    const timeStr = `${hours}h ${minutes}m`;
-    const icon = this.getStateIcon(state);
+    const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    const icon = STATE_ICONS[state.toLowerCase()] || '$(circle-outline)';
 
-    this.statusBarItem.text = `💻 Today ${timeStr} | ${icon} ${state} | 🔥 ${streak}d`;
+    // Format: $(code) 2h 30m · Coding · 🔥 5d
+    this.statusBarItem.text = `$(clock) ${timeStr}  ${icon} ${state}  $(flame) ${streak}d`;
     this.statusBarItem.show();
-  }
-
-  private getStateIcon(state: string): string {
-    switch (state.toLowerCase()) {
-      case 'coding':
-        return '⚡';
-      case 'reading':
-        return '📖';
-      case 'debugging':
-        return '🐞';
-      case 'terminal':
-        return '🖥️';
-      case 'git':
-        return '🧬';
-      case 'testing':
-        return '🧪';
-      case 'ai assisting':
-        return '🤖';
-      case 'idle':
-      default:
-        return '⌛';
-    }
   }
 
   public dispose() {

@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/jeem-labs.dev-activity-tracker.svg?color=indigo)](https://marketplace.visualstudio.com/items?itemName=jeem-labs.dev-activity-tracker)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/jeem-labs.dev-activity-tracker.svg)](https://marketplace.visualstudio.com/items?itemName=jeem-labs.dev-activity-tracker)
-[![License](https://img.shields.io/github/license/jeem-labs/dev-activity-tracker?color=emerald)](LICENSE)
+[![License](https://img.shields.io/github/license/ijahangirabbas/Dev-Activity-Tracker?color=emerald)](LICENSE)
 
 A professional, production-grade Visual Studio Code extension that automatically tracks your complete coding workflow with **zero manual interaction**. No start buttons, no stop buttons, no manual timers—it runs quietly in the background, respects your privacy, and visualizes your coding productivity in a premium interactive dashboard.
 

@@ -170,11 +170,109 @@ function testDatabaseService() {
   console.log('Database Service tests completed.');
 }
 
+// 4. Test Multi-Window Active Session Merge Coordination
+function testMultiProcessMerge() {
+  console.log('\n--- Testing Multi-Window Active Session Merge ---');
+  const tempDir = path.join(__dirname, 'temp_db_merge_test');
+  
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  const db = new DatabaseService(tempDir);
+  
+  const mockSessionA: DevSession = {
+    id: 'active_session_A',
+    startTime: Date.now() - 600 * 1000,
+    endTime: Date.now(),
+    duration: 600,
+    workspaceName: 'Project Alpha',
+    workspacePath: 'C:\\Alpha',
+    repository: 'alpha-repo',
+    branch: 'main',
+    codingTime: 400,
+    readingTime: 200,
+    debuggingTime: 0,
+    terminalTime: 0,
+    gitTime: 0,
+    testingTime: 0,
+    aiTime: 0,
+    editsCount: 10,
+    readsCount: 5,
+    files: {},
+    languages: { 'TypeScript': 600 },
+    terminalCommands: [],
+    terminalSessionsCount: 0,
+    gitCommitsCount: 0,
+    debugSessionsCount: 0,
+    testRunsSuccess: 0,
+    testRunsFailed: 0,
+    timeline: []
+  };
+
+  const mockSessionB: DevSession = {
+    id: 'active_session_B',
+    startTime: Date.now() - 300 * 1000,
+    endTime: Date.now(),
+    duration: 300,
+    workspaceName: 'Project Beta',
+    workspacePath: 'C:\\Beta',
+    repository: 'beta-repo',
+    branch: 'main',
+    codingTime: 100,
+    readingTime: 200,
+    debuggingTime: 0,
+    terminalTime: 0,
+    gitTime: 0,
+    testingTime: 0,
+    aiTime: 0,
+    editsCount: 2,
+    readsCount: 8,
+    files: {},
+    languages: { 'Python': 300 },
+    terminalCommands: [],
+    terminalSessionsCount: 0,
+    gitCommitsCount: 0,
+    debugSessionsCount: 0,
+    testRunsSuccess: 0,
+    testRunsFailed: 0,
+    timeline: []
+  };
+
+  // Write active sessions representing concurrent windows
+  db.writeActiveSession('win_A', mockSessionA);
+  db.writeActiveSession('win_B', mockSessionB);
+
+  // Verify that active sessions exist and count matches
+  const activeList = db.getActiveSessions();
+  assert(activeList.length === 2, 'Should retrieve two active sessions');
+  assert(activeList.some(s => s.id === 'active_session_A'), 'Should retrieve active session A');
+  assert(activeList.some(s => s.id === 'active_session_B'), 'Should retrieve active session B');
+
+  // Verify merge calculations in database representation
+  const merged = db.getMergedLiveDatabase(activeList, 14400);
+  assert(merged.sessions.some(s => s.id === 'active_session_A'), 'Merged database should contain active session A');
+  assert(merged.sessions.some(s => s.id === 'active_session_B'), 'Merged database should contain active session B');
+  assert(merged.projects['Project Alpha'] !== undefined, 'Project Alpha stats should be aggregated');
+  assert(merged.projects['Project Beta'] !== undefined, 'Project Beta stats should be aggregated');
+
+  // Clean up sessions
+  db.deleteActiveSession('win_A');
+  db.deleteActiveSession('win_B');
+  assert(db.getActiveSessions().length === 0, 'Active sessions list should be empty after delete');
+
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+  console.log('Multi-Window Active Session Merge tests completed.');
+}
+
 async function runAll() {
   try {
     await testIdleDetector();
     testSessionManager();
     testDatabaseService();
+    testMultiProcessMerge();
     console.log('\n==================================');
     console.log('ALL UNIT TESTS COMPLETED SUCCESSFULLY!');
     console.log('==================================');

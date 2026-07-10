@@ -37,7 +37,7 @@ export class DashboardPanel {
       {
         enableScripts: true,
         localResourceRoots: [
-          vscode.Uri.file(path.join(extensionUri.fsPath, 'src', 'views')),
+          vscode.Uri.file(path.join(extensionUri.fsPath, 'views')),
           vscode.Uri.file(path.join(extensionUri.fsPath, 'dist'))
         ],
         retainContextWhenHidden: true
@@ -83,6 +83,9 @@ export class DashboardPanel {
           case 'restore':
             await this.handleRestore();
             break;
+          case 'syncToCloud':
+            vscode.commands.executeCommand('dev-activity-tracker.syncToCloud');
+            break;
         }
       },
       null,
@@ -93,7 +96,7 @@ export class DashboardPanel {
   public update() {
     this.panel.webview.postMessage({
       command: 'updateData',
-      db: this.dbService.getDatabase(),
+      db: this.tracker.getLiveDatabase(),
       config: this.tracker.getActiveState() ? this.getTrackerConfig() : undefined
     });
   }
@@ -104,7 +107,10 @@ export class DashboardPanel {
       idleTimeout: config.get<number>('idleTimeout') || 300,
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
-      showStatusBar: config.get<boolean>('showStatusBar') || true
+      showStatusBar: config.get<boolean>('showStatusBar') || true,
+      supabaseUrl: config.get<string>('supabaseUrl') || '',
+      supabaseServiceKey: '', // never send service key to frontend
+      supabaseUserId: config.get<string>('supabaseUserId') || ''
     };
   }
 
@@ -239,15 +245,15 @@ export class DashboardPanel {
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {
-    const htmlPath = path.join(this.extensionUri.fsPath, 'src', 'views', 'dashboard.html');
+    const htmlPath = path.join(this.extensionUri.fsPath, 'views', 'dashboard.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
 
     // Resolve CSS & JS URIs
     const cssUri = webview.asWebviewUri(vscode.Uri.file(
-      path.join(this.extensionUri.fsPath, 'src', 'views', 'dashboard.css')
+      path.join(this.extensionUri.fsPath, 'views', 'dashboard.css')
     ));
     const jsUri = webview.asWebviewUri(vscode.Uri.file(
-      path.join(this.extensionUri.fsPath, 'src', 'views', 'dashboard.js')
+      path.join(this.extensionUri.fsPath, 'views', 'dashboard.js')
     ));
 
     html = html.replace('id="style-link" href=""', `id="style-link" href="${cssUri}"`);

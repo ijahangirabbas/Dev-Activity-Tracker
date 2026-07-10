@@ -1,20 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionManager = void 0;
-class SessionManager {
-    currentSession = null;
-    startSession(workspaceName, workspacePath, repository, branch) {
-        const now = Date.now();
-        const id = `session_${now}_${Math.random().toString(36).substring(2, 9)}`;
+var SessionManager = /** @class */ (function () {
+    function SessionManager() {
+        this.currentSession = null;
+    }
+    SessionManager.prototype.startSession = function (workspaceName, workspacePath, repository, branch) {
+        var now = Date.now();
+        var id = "session_".concat(now, "_").concat(Math.random().toString(36).substring(2, 9));
         this.currentSession = {
-            id,
+            id: id,
             startTime: now,
             endTime: now,
             duration: 0,
-            workspaceName,
-            workspacePath,
-            repository,
-            branch,
+            workspaceName: workspaceName,
+            workspacePath: workspacePath,
+            repository: repository,
+            branch: branch,
             codingTime: 0,
             readingTime: 0,
             debuggingTime: 0,
@@ -41,11 +43,11 @@ class SessionManager {
             ]
         };
         return this.currentSession;
-    }
-    getCurrentSession() {
+    };
+    SessionManager.prototype.getCurrentSession = function () {
         return this.currentSession;
-    }
-    updateSessionTimes(activeCategory, deltaSeconds) {
+    };
+    SessionManager.prototype.updateSessionTimes = function (activeCategory, deltaSeconds) {
         if (!this.currentSession) {
             return;
         }
@@ -74,23 +76,23 @@ class SessionManager {
                 this.currentSession.aiTime += deltaSeconds;
                 break;
         }
-    }
-    recordFileActivity(relativePath, fileName, languageId, isEdit, deltaSeconds) {
+    };
+    SessionManager.prototype.recordFileActivity = function (relativePath, fileName, languageId, isEdit, deltaSeconds) {
         if (!this.currentSession) {
             return;
         }
         if (!this.currentSession.files[relativePath]) {
             this.currentSession.files[relativePath] = {
-                relativePath,
-                fileName,
-                languageId,
+                relativePath: relativePath,
+                fileName: fileName,
+                languageId: languageId,
                 timeSpent: 0,
                 editsCount: 0,
                 readsCount: 0,
                 lastActive: Date.now()
             };
         }
-        const file = this.currentSession.files[relativePath];
+        var file = this.currentSession.files[relativePath];
         file.timeSpent += deltaSeconds;
         file.lastActive = Date.now();
         if (isEdit) {
@@ -105,41 +107,41 @@ class SessionManager {
         if (languageId) {
             this.currentSession.languages[languageId] = (this.currentSession.languages[languageId] || 0) + deltaSeconds;
         }
-    }
-    recordTerminalCommand(command, category) {
+    };
+    SessionManager.prototype.recordTerminalCommand = function (command, category) {
         if (!this.currentSession) {
             return;
         }
-        const cmdEvent = {
-            command,
-            category,
+        var cmdEvent = {
+            command: command,
+            category: category,
             timestamp: Date.now()
         };
         this.currentSession.terminalCommands.push(cmdEvent);
-        this.addTimelineEvent(`Executed Terminal Command: ${command.slice(0, 30)}${command.length > 30 ? '...' : ''}`, 'terminal');
-    }
-    recordGitCommit() {
+        this.addTimelineEvent("Executed Terminal Command: ".concat(command.slice(0, 30)).concat(command.length > 30 ? '...' : ''), 'terminal');
+    };
+    SessionManager.prototype.recordGitCommit = function () {
         if (!this.currentSession) {
             return;
         }
         this.currentSession.gitCommitsCount += 1;
         this.addTimelineEvent('Git Commit Detected', 'git');
-    }
-    recordBranchSwitch(branch) {
+    };
+    SessionManager.prototype.recordBranchSwitch = function (branch) {
         if (!this.currentSession) {
             return;
         }
         this.currentSession.branch = branch;
-        this.addTimelineEvent(`Switched Git Branch to ${branch}`, 'git');
-    }
-    recordDebugSessionStart() {
+        this.addTimelineEvent("Switched Git Branch to ".concat(branch), 'git');
+    };
+    SessionManager.prototype.recordDebugSessionStart = function () {
         if (!this.currentSession) {
             return;
         }
         this.currentSession.debugSessionsCount += 1;
         this.addTimelineEvent('Debugging Started', 'debugging');
-    }
-    recordTestRun(success) {
+    };
+    SessionManager.prototype.recordTestRun = function (success) {
         if (!this.currentSession) {
             return;
         }
@@ -151,40 +153,40 @@ class SessionManager {
             this.currentSession.testRunsFailed += 1;
             this.addTimelineEvent('Testing Failed', 'testing');
         }
-    }
-    recordAIActivity() {
+    };
+    SessionManager.prototype.recordAIActivity = function () {
         if (!this.currentSession) {
             return;
         }
         this.addTimelineEvent('AI Assistant Used', 'ai');
-    }
-    addTimelineEvent(description, category) {
+    };
+    SessionManager.prototype.addTimelineEvent = function (description, category) {
         if (!this.currentSession) {
             return;
         }
         // De-duplicate fast-firing identical timeline events in a short window
-        const now = Date.now();
-        const lastEvent = this.currentSession.timeline[this.currentSession.timeline.length - 1];
+        var now = Date.now();
+        var lastEvent = this.currentSession.timeline[this.currentSession.timeline.length - 1];
         if (lastEvent && lastEvent.description === description && (now - lastEvent.timestamp < 10000)) {
             return;
         }
         this.currentSession.timeline.push({
             timestamp: now,
-            description,
-            category
+            description: description,
+            category: category
         });
-    }
-    recordTerminalSessionsCount(count) {
+    };
+    SessionManager.prototype.recordTerminalSessionsCount = function (count) {
         if (!this.currentSession) {
             return;
         }
         this.currentSession.terminalSessionsCount = Math.max(this.currentSession.terminalSessionsCount, count);
-    }
-    endSession() {
+    };
+    SessionManager.prototype.endSession = function () {
         if (!this.currentSession) {
             return null;
         }
-        const session = this.currentSession;
+        var session = this.currentSession;
         session.endTime = Date.now();
         session.timeline.push({
             timestamp: session.endTime,
@@ -193,6 +195,7 @@ class SessionManager {
         });
         this.currentSession = null;
         return session;
-    }
-}
+    };
+    return SessionManager;
+}());
 exports.SessionManager = SessionManager;
