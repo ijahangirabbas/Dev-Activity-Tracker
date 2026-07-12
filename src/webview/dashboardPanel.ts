@@ -108,9 +108,7 @@ export class DashboardPanel {
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
       showStatusBar: config.get<boolean>('showStatusBar') || true,
-      supabaseUrl: config.get<string>('supabaseUrl') || '',
-      supabaseServiceKey: '', // never send service key to frontend
-      supabaseUserId: config.get<string>('supabaseUserId') || ''
+      userId: config.get<string>('userId') || ''
     };
   }
 
@@ -121,6 +119,9 @@ export class DashboardPanel {
       await vsConfig.update('dailyGoal', config.dailyGoal, vscode.ConfigurationTarget.Global);
       await vsConfig.update('privacyMode', config.privacyMode, vscode.ConfigurationTarget.Global);
       await vsConfig.update('showStatusBar', config.showStatusBar, vscode.ConfigurationTarget.Global);
+      if (config.userId !== undefined) {
+        await vsConfig.update('userId', config.userId, vscode.ConfigurationTarget.Global);
+      }
       
       this.tracker.updateConfig();
       vscode.window.showInformationMessage('Settings saved and applied successfully.');

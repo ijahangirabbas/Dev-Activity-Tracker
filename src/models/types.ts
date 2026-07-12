@@ -111,7 +111,5 @@ export interface ExtensionConfig {
   dailyGoal: number; // in seconds
   privacyMode: boolean;
   showStatusBar: boolean;
-  supabaseUrl: string;
-  supabaseServiceKey: string;
-  supabaseUserId: string;
+  userId: string;
 }

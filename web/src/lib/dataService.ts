@@ -1,9 +1,33 @@
 import { DevSession, DailyProgress, DBStreak } from 'web/types';
 import { apiClient } from './api';
+import { syncLocalDataToCloud } from './syncService';
 
 // Global cache to check if the local VS Code server is offline, avoiding multiple timeout hangs
 let isLocalServerOffline = false;
 let lastLocalCheckTime = 0;
+
+// Helper to trigger background sync if auto-sync is enabled
+let isSyncingInProgress = false;
+
+export function triggerBackgroundSync(localDb: any) {
+  if (isSyncingInProgress) return;
+  const isAutoSyncEnabled = localStorage.getItem('dev_tracker_auto_sync') !== 'false';
+  if (!isAutoSyncEnabled) return;
+
+  isSyncingInProgress = true;
+  syncLocalDataToCloud(localDb)
+    .then((result) => {
+      if (result.success && result.syncedSessionsCount > 0) {
+        console.log(`[SyncEngine] Automatically synced ${result.syncedSessionsCount} sessions to cloud.`);
+      }
+    })
+    .catch((err) => {
+      console.error('[SyncEngine] Background sync failed:', err);
+    })
+    .finally(() => {
+      isSyncingInProgress = false;
+    });
+}
 
 // Helper to fetch data from the background VS Code API server if online
 async function fetchLocalData(): Promise<any> {
@@ -43,6 +67,7 @@ export const sessionApi = {
     try {
       const local = await fetchLocalData();
       if (local && local.db && Array.isArray(local.db.sessions)) {
+        triggerBackgroundSync(local.db);
         const sessions = local.db.sessions.map((s: any) => ({
           id: s.id,
           startTime: s.startTime,
@@ -101,6 +126,7 @@ export const progressApi = {
     try {
       const local = await fetchLocalData();
       if (local && local.db && local.db.dailyProgress) {
+        triggerBackgroundSync(local.db);
         const progressList = Object.values(local.db.dailyProgress).map((dp: any) => ({
           date: dp.date,
           codingTime: dp.codingTime || 0,
@@ -129,6 +155,7 @@ export const streakApi = {
     try {
       const local = await fetchLocalData();
       if (local && local.db && local.db.streaks) {
+        triggerBackgroundSync(local.db);
         const streaks = local.db.streaks;
         return [{
           user_id: 'local_user',

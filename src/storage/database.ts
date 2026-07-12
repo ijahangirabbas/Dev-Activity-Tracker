@@ -460,6 +460,25 @@ export class DatabaseService {
     return mergedDb;
   }
 
+  public getLiveStreak(streak: StreakStats): number {
+    if (!streak || !streak.lastActiveDate) { return 0; }
+    
+    const todayStr = this.formatDate(new Date());
+    if (streak.lastActiveDate === todayStr) {
+      return streak.currentStreak;
+    }
+    
+    const lastDate = new Date(streak.lastActiveDate);
+    const todayDate = new Date(todayStr);
+    const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 1) {
+      return streak.currentStreak;
+    }
+    return 0;
+  }
+
   // Backup methods
   public backup(): string {
     try {

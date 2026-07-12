@@ -1,15 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from 'web/components/AuthProvider';
-import { Copy, Check, ShieldAlert, Key, Link2 } from 'lucide-react';
+import { Copy, Check, ShieldAlert, Key, Link2, Sparkles, RefreshCw } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [autoSync, setAutoSync] = useState(true);
+  const [isLocalOnline, setIsLocalOnline] = useState(false);
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-supabase-url.supabase.co';
   const userId = user?.id || '';
+
+  // Load autoSync setting from localStorage on mount
+  useEffect(() => {
+    const savedAutoSync = localStorage.getItem('dev_tracker_auto_sync') !== 'false';
+    setAutoSync(savedAutoSync);
+
+    // Check local server
+    const checkLocal = async () => {
+      try {
+        const res = await fetch('http://localhost:54321/api/data');
+        setIsLocalOnline(res.ok);
+      } catch (e) {
+        setIsLocalOnline(false);
+      }
+    };
+    checkLocal();
+  }, []);
+
+  const handleAutoSyncToggle = (checked: boolean) => {
+    setAutoSync(checked);
+    localStorage.setItem('dev_tracker_auto_sync', checked ? 'true' : 'false');
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -20,19 +43,19 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 py-2">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-text-primary">Sync Settings</h1>
-        <p className="text-xs text-text-secondary mt-1">Configure your local VS Code extension to push activity data to the cloud</p>
+        <h1 className="text-3xl font-serif font-bold text-text-primary">Sync & Integration Settings</h1>
+        <p className="text-xs text-text-secondary mt-1">Configure connection between VS Code and your personal cloud profile</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Side: Credentials */}
+        {/* Left Side: Credentials and Preferences */}
         <div className="lg:col-span-2 space-y-6">
           {/* User ID block */}
           <div className="p-6 rounded-2xl glass-card relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-sm font-bold text-text-primary">Your Auth Credentials</h3>
-                <p className="text-xs text-text-secondary mt-1">Use these credentials in your VS Code configuration settings</p>
+                <h3 className="text-sm font-bold text-text-primary">Your Cloud Credentials</h3>
+                <p className="text-xs text-text-secondary mt-1">Use this ID to pair your local VS Code extension</p>
               </div>
               <div className="p-2.5 rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
                 <Key size={16} />
@@ -42,7 +65,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               {/* User ID */}
               <div>
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">Supabase Auth User ID</label>
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">User Connection Key (UUID)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -58,29 +81,44 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
-
-              {/* Supabase URL */}
-              <div>
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">Supabase Database URL</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={supabaseUrl}
-                  className="w-full bg-card-bg/60 border border-border-default rounded-xl px-4 py-3 text-xs font-mono text-text-secondary focus:outline-none select-all"
-                />
-              </div>
             </div>
           </div>
 
-          {/* Security details alert */}
-          <div className="p-5 rounded-2xl bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-xs flex gap-3 leading-relaxed">
-            <ShieldAlert size={18} className="shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="font-bold block">Important Security Notice</span>
-              <span>
-                To configure writing data from VS Code, you must specify your Supabase `service_role` key inside VS Code.
-                **Never upload this service role key to this website or commit it to any public repositories.** It must remain secret and resides securely on your local IDE client only.
-              </span>
+          {/* Cloud Sync Preferences */}
+          <div className="p-6 rounded-2xl glass-card">
+            <h3 className="text-sm font-bold text-text-primary mb-4">Synchronization Preferences</h3>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-card-hover-bg/30 border border-border-default">
+                <div>
+                  <h4 className="text-xs font-bold text-text-primary">Auto-Sync to Cloud</h4>
+                  <p className="text-[10px] text-text-secondary mt-0.5">Automatically sync local sessions when dashboard is open</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={autoSync} 
+                    onChange={(e) => handleAutoSyncToggle(e.target.checked)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-9 h-5 bg-border-default rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-primary" />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-xl bg-card-hover-bg/30 border border-border-default">
+                <div>
+                  <h4 className="text-xs font-bold text-text-primary">Connection Status</h4>
+                  <p className="text-[10px] text-text-secondary mt-0.5">Communication link with localhost tracker server</p>
+                </div>
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
+                  isLocalOnline 
+                    ? 'bg-accent-green/10 border-accent-green/20 text-accent-green' 
+                    : 'bg-accent-amber/10 border-accent-amber/20 text-accent-amber'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLocalOnline ? 'bg-accent-green' : 'bg-accent-amber'}`} />
+                  <span>{isLocalOnline ? 'Online' : 'Offline / Idle'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -91,7 +129,7 @@ export default function SettingsPage() {
             <div className="p-2 rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
               <Link2 size={16} />
             </div>
-            <h3 className="text-sm font-bold text-text-primary">Integration Steps</h3>
+            <h3 className="text-sm font-bold text-text-primary">Setup Instructions</h3>
           </div>
 
           <div className="space-y-4 text-xs text-text-secondary leading-relaxed">
@@ -101,25 +139,20 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">2</span>
-              <span>Search for **&quot;Developer Activity&quot;** to view configurations.</span>
+              <span>Search for **&quot;Developer Activity&quot;** configurations.</span>
             </div>
             <div className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">3</span>
               <div className="space-y-1">
-                <span>Copy and paste the credentials from this page:</span>
-                <ul className="list-disc list-inside mt-1 space-y-1 text-text-muted">
-                  <li>`supabaseUrl`</li>
-                  <li>`supabaseUserId`</li>
-                </ul>
+                <span>Copy and paste your **User Connection Key** from this page into:</span>
+                <div className="font-mono text-[10px] text-accent-primary bg-card-bg/60 border border-border-default rounded-lg px-2 py-1.5 mt-1 block">
+                  devActivityTracker.userId
+                </div>
               </div>
             </div>
             <div className="flex gap-3">
               <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">4</span>
-              <span>Paste your Supabase API `service_role` key into `supabaseServiceKey`.</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">5</span>
-              <span>Open command palette and run **&quot;Sync Data to Cloud (Supabase)&quot;** to upload.</span>
+              <span>Your local code tracking sessions will now sync to this cloud dashboard automatically in the background when it is open!</span>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { WorkspaceTracker } from '../workspace/workspaceTracker';
 import { FileTracker } from '../files/fileTracker';
 import { AITracker } from '../ai/aiTracker';
 import { LanguageTracker } from '../languages/languageTracker';
-import { SupabaseSyncService } from '../services/supabaseSync';
+import { DashboardPanel } from '../webview/dashboardPanel';
 import { ExtensionConfig, TerminalCommandEvent } from '../models/types';
 
 export class Tracker {
@@ -49,7 +49,6 @@ export class Tracker {
 
     // Cache config once at startup — refreshed via updateConfig()
     this.cachedConfig = this.readConfig();
-    this.supabaseSync = this.buildSupabaseSync(this.cachedConfig);
 
     // Initialize Idle Detector
     this.idleDetector = new IdleDetector(this.cachedConfig.idleTimeout, (isIdle) => {
@@ -85,24 +84,14 @@ export class Tracker {
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
       showStatusBar: config.get<boolean>('showStatusBar') || true,
-      supabaseUrl: config.get<string>('supabaseUrl') || '',
-      supabaseServiceKey: config.get<string>('supabaseServiceKey') || '',
-      supabaseUserId: config.get<string>('supabaseUserId') || ''
+      userId: config.get<string>('userId') || ''
     };
-  }
-
-  private buildSupabaseSync(config: ExtensionConfig): SupabaseSyncService | undefined {
-    if (config.supabaseUrl && config.supabaseServiceKey && config.supabaseUserId) {
-      return new SupabaseSyncService(config.supabaseUrl, config.supabaseServiceKey, config.supabaseUserId);
-    }
-    return undefined;
   }
 
   // Called by extension.ts on onDidChangeConfiguration
   public updateConfig(): void {
     this.cachedConfig = this.readConfig();
     this.idleDetector.updateTimeout(this.cachedConfig.idleTimeout);
-    this.supabaseSync = this.buildSupabaseSync(this.cachedConfig);
   }
 
   private registerVscodeListeners() {
@@ -304,6 +293,13 @@ export class Tracker {
     // Heuristically classify current activity state
     let activeState = 'reading';
 
+    const isDashboardActive = !!(DashboardPanel.currentPanel && (DashboardPanel.currentPanel as any).panel?.active);
+    const isTerminalFocused = !vscode.window.activeTextEditor && !!vscode.window.activeTerminal && vscode.window.state.focused && !isDashboardActive;
+
+    if (isTerminalFocused) {
+      this.lastTerminalTime = now;
+    }
+
     if (vscode.debug.activeDebugSession) {
       activeState = 'debugging';
     } else if (now - this.lastAITime < 15000) {
@@ -360,21 +356,6 @@ export class Tracker {
     if (session && session.duration > 5) {
       this.dbService.deleteActiveSession(this.windowId);
       this.dbService.addSession(session, this.cachedConfig.dailyGoal);
-
-      // Auto-sync to Supabase if configured
-      if (this.supabaseSync && this.supabaseSync.isConfigured()) {
-        try {
-          await this.supabaseSync.syncSession(session);
-          const db = this.dbService.getDatabase();
-          const todayStr = this.localDateString(new Date(session.startTime));
-          if (db.dailyProgress[todayStr]) {
-            await this.supabaseSync.syncDailyProgress(todayStr, db.dailyProgress[todayStr]);
-          }
-          await this.supabaseSync.syncStreaks(db.streaks);
-        } catch (e) {
-          console.error('[SupabaseSync] Auto-sync failed:', e);
-        }
-      }
     }
   }
 

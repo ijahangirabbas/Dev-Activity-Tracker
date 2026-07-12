@@ -16,8 +16,12 @@ import {
   Search,
   User,
   Command,
-  Loader2
+  Loader2,
+  Cloud,
+  CloudOff,
+  RefreshCw
 } from 'lucide-react';
+import { syncLocalDataToCloud } from 'web/lib/syncService';
 
 // Import tab sub-pages to render in-place in a single dashboard layout console
 import OverviewPage from 'web/app/(dashboard)/dashboard/page';
@@ -32,6 +36,59 @@ export default function DashboardLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isLocalOnline, setIsLocalOnline] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Monitor connection to the VS Code local API server
+  useEffect(() => {
+    const checkLocalServer = async () => {
+      try {
+        const res = await fetch('http://localhost:54321/api/data');
+        if (res.ok) {
+          setIsLocalOnline(true);
+        } else {
+          setIsLocalOnline(false);
+        }
+      } catch (e) {
+        setIsLocalOnline(false);
+      }
+    };
+
+    checkLocalServer();
+    const interval = setInterval(checkLocalServer, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncStatus('Connecting to local tracker...');
+    try {
+      const res = await fetch('http://localhost:54321/api/data');
+      if (!res.ok) throw new Error('Local server offline');
+      const data = await res.json();
+      
+      setSyncStatus('Syncing database...');
+      const result = await syncLocalDataToCloud(data.db);
+      if (result.success) {
+        setSyncStatus(`Synced!`);
+        setTimeout(() => setSyncStatus(null), 2500);
+        // Dispatch event or reload to update React Query state
+        window.dispatchEvent(new Event('local_sync_completed'));
+        // Invalidate queries via location.reload or state update
+        window.location.reload();
+      } else {
+        setSyncStatus(`Failed: ${result.error}`);
+        setTimeout(() => setSyncStatus(null), 4000);
+      }
+    } catch (e: any) {
+      setSyncStatus(`Offline: ${e.message}`);
+      setTimeout(() => setSyncStatus(null), 4000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Set default theme from localStorage on component mount
   useEffect(() => {
@@ -177,11 +234,41 @@ export default function DashboardLayout() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Sync status message */}
+            {syncStatus && (
+              <span className="hidden md:inline-block text-[10px] font-bold font-mono text-accent-primary animate-pulse bg-accent-primary/10 border border-accent-primary/15 rounded-lg px-2.5 py-1">
+                {syncStatus}
+              </span>
+            )}
+
+            {/* Local Server Connection Status */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition ${
+              isLocalOnline 
+                ? 'bg-accent-green/10 border-accent-green/20 text-accent-green' 
+                : 'bg-card-bg/60 border-border-default text-text-secondary'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isLocalOnline ? 'bg-accent-green animate-pulse' : 'bg-text-secondary'}`} />
+              <span>{isLocalOnline ? 'Local Connected' : 'Cloud Mode'}</span>
+            </div>
+
+            {/* Manual Sync Trigger */}
+            {isLocalOnline && (
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-accent-primary/20 bg-accent-primary/10 hover:bg-accent-primary/20 text-accent-primary text-xs font-semibold cursor-pointer active:scale-95 transition disabled:opacity-60"
+                title="Synchronize local logs with Supabase"
+              >
+                <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                <span>Sync Now</span>
+              </button>
+            )}
+
             {/* Search command shortcut */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="hidden sm:flex items-center gap-3 px-3.5 py-2 rounded-xl bg-card-bg/60 border border-border-default text-xs text-text-secondary hover:text-text-primary hover:border-border-hover transition"
+              className="hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-card-bg/60 border border-border-default text-xs text-text-secondary hover:text-text-primary hover:border-border-hover transition"
             >
               <Search size={14} />
               <span>Search Workspace...</span>

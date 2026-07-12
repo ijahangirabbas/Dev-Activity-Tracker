@@ -14,6 +14,18 @@ const STATE_ICONS: Record<string, string> = {
   'idle':         '$(clock)',
 };
 
+const STATE_DISPLAY_NAMES: Record<string, string> = {
+  'coding':       'Coding',
+  'reading':      'Reading',
+  'debugging':    'Debugging',
+  'terminal':     'Terminal',
+  'git':          'Git',
+  'testing':      'Testing',
+  'ai':           'AI Assisting',
+  'ai assisting': 'AI Assisting',
+  'idle':         'Idle',
+};
+
 export class StatusbarManager {
   private statusBarItem: vscode.StatusBarItem;
   private dbService: DatabaseService;
@@ -41,13 +53,16 @@ export class StatusbarManager {
 
     const hours = Math.floor(secondsToday / 3600);
     const minutes = Math.floor((secondsToday % 3600) / 60);
-    const streak = this.dbService.getDatabase().streaks?.development?.currentStreak || 0;
+    const streak = this.dbService.getLiveStreak(this.dbService.getDatabase().streaks?.development);
 
     const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-    const icon = STATE_ICONS[state.toLowerCase()] || '$(circle-outline)';
+    
+    const normState = state.toLowerCase() === 'ai' ? 'ai assisting' : state.toLowerCase();
+    const displayName = STATE_DISPLAY_NAMES[normState] || state;
+    const icon = STATE_ICONS[normState] || '$(circle-outline)';
 
     // Format: $(code) 2h 30m · Coding · 🔥 5d
-    this.statusBarItem.text = `$(clock) ${timeStr}  ${icon} ${state}  $(flame) ${streak}d`;
+    this.statusBarItem.text = `$(clock) ${timeStr}  ${icon} ${displayName}  $(flame) ${streak}d`;
     this.statusBarItem.show();
   }
 

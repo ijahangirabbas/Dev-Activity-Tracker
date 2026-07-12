@@ -36,7 +36,8 @@ export class LocalServer {
             idleTimeout: config.get<number>('idleTimeout') || 300,
             dailyGoal: config.get<number>('dailyGoal') || 14400,
             privacyMode: config.get<boolean>('privacyMode') || false,
-            showStatusBar: config.get<boolean>('showStatusBar') || true
+            showStatusBar: config.get<boolean>('showStatusBar') || true,
+            userId: config.get<string>('userId') || ''
           };
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -66,6 +67,9 @@ export class LocalServer {
             }
             if (settings.showStatusBar !== undefined) {
               await vsConfig.update('showStatusBar', settings.showStatusBar, vscode.ConfigurationTarget.Global);
+            }
+            if (settings.userId !== undefined) {
+              await vsConfig.update('userId', settings.userId, vscode.ConfigurationTarget.Global);
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
