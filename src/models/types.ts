@@ -110,6 +110,7 @@ export interface ExtensionConfig {
   idleTimeout: number; // in seconds
   dailyGoal: number; // in seconds
   privacyMode: boolean;
+  recordRawTerminalCommands: boolean;
   showStatusBar: boolean;
   userId: string;
 }

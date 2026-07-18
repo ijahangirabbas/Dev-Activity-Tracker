@@ -84,7 +84,7 @@ export class DashboardPanel {
             await this.handleRestore();
             break;
           case 'syncToCloud':
-            vscode.commands.executeCommand('dev-activity-tracker.syncToCloud');
+            vscode.commands.executeCommand('devtracker.syncToCloud');
             break;
         }
       },
@@ -102,11 +102,12 @@ export class DashboardPanel {
   }
 
   private getTrackerConfig(): ExtensionConfig {
-    const config = vscode.workspace.getConfiguration('devActivityTracker');
+    const config = vscode.workspace.getConfiguration('devTracker');
     return {
       idleTimeout: config.get<number>('idleTimeout') || 300,
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
+      recordRawTerminalCommands: config.get<boolean>('recordRawTerminalCommands') || false,
       showStatusBar: config.get<boolean>('showStatusBar') || true,
       userId: config.get<string>('userId') || ''
     };
@@ -114,7 +115,7 @@ export class DashboardPanel {
 
   private async handleSaveSettings(config: ExtensionConfig) {
     try {
-      const vsConfig = vscode.workspace.getConfiguration('devActivityTracker');
+      const vsConfig = vscode.workspace.getConfiguration('devTracker');
       await vsConfig.update('idleTimeout', config.idleTimeout, vscode.ConfigurationTarget.Global);
       await vsConfig.update('dailyGoal', config.dailyGoal, vscode.ConfigurationTarget.Global);
       await vsConfig.update('privacyMode', config.privacyMode, vscode.ConfigurationTarget.Global);
@@ -249,6 +250,9 @@ export class DashboardPanel {
     const htmlPath = path.join(this.extensionUri.fsPath, 'views', 'dashboard.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
 
+    // Generate random nonce
+    const nonce = this.getNonce();
+
     // Resolve CSS & JS URIs
     const cssUri = webview.asWebviewUri(vscode.Uri.file(
       path.join(this.extensionUri.fsPath, 'views', 'dashboard.css')
@@ -256,11 +260,28 @@ export class DashboardPanel {
     const jsUri = webview.asWebviewUri(vscode.Uri.file(
       path.join(this.extensionUri.fsPath, 'views', 'dashboard.js')
     ));
+    const lucideUri = webview.asWebviewUri(vscode.Uri.file(
+      path.join(this.extensionUri.fsPath, 'views', 'lucide.min.js')
+    ));
 
     html = html.replace('id="style-link" href=""', `id="style-link" href="${cssUri}"`);
-    html = html.replace('id="script-link" src=""', `id="script-link" src="${jsUri}"`);
+    html = html.replace('id="script-link" src="" nonce="{{nonce}}"', `id="script-link" src="${jsUri}" nonce="${nonce}"`);
+    html = html.replace('id="lucide-link" src="" nonce="{{nonce}}"', `id="lucide-link" src="${lucideUri}" nonce="${nonce}"`);
+
+    // Replace CSP templates
+    html = html.replace(/\{\{cspSource\}\}/g, webview.cspSource);
+    html = html.replace(/\{\{nonce\}\}/g, nonce);
 
     return html;
+  }
+
+  private getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
   }
 
   public dispose() {

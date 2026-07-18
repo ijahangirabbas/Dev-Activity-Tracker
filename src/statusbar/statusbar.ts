@@ -36,18 +36,25 @@ export class StatusbarManager {
       vscode.StatusBarAlignment.Right,
       100
     );
-    this.statusBarItem.command = 'dev-activity-tracker.showDashboard';
-    this.statusBarItem.tooltip = 'Developer Activity Analytics — Click to open Dashboard';
+    this.statusBarItem.command = 'devtracker.showDashboard';
+    this.statusBarItem.tooltip = 'DevTracker - Click to open Dashboard';
     this.update('Reading', 0);
     this.statusBarItem.show();
   }
 
-  public update(state: string, secondsToday: number) {
-    const config = vscode.workspace.getConfiguration('devActivityTracker');
+  public update(state: string, secondsToday: number, isPaused: boolean = false) {
+    const config = vscode.workspace.getConfiguration('devTracker');
     const showStatusBar = config.get<boolean>('showStatusBar') ?? true;
 
     if (!showStatusBar) {
       this.statusBarItem.hide();
+      return;
+    }
+
+    if (isPaused) {
+      this.statusBarItem.text = `$(circle-slash) DevTracker (Paused)`;
+      this.statusBarItem.tooltip = 'DevTracker - Click to open Dashboard (Tracking is Paused)';
+      this.statusBarItem.show();
       return;
     }
 
