@@ -76,7 +76,7 @@ export default function ComparisonTable() {
           <thead>
             <tr className="border-b border-border-default bg-card-hover-bg/30">
               <th className="p-4 md:p-5 font-bold text-text-secondary">Capability</th>
-              <th className="p-4 md:p-5 font-bold text-accent-primary bg-accent-primary/5">Dev Activity Tracker</th>
+              <th className="p-4 md:p-5 font-bold text-accent-primary bg-accent-primary/5">DevTracker</th>
               <th className="p-4 md:p-5 font-bold text-text-muted">Legacy Manual Timers</th>
             </tr>
           </thead>

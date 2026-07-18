@@ -3,6 +3,36 @@
   let db = null;
   let activeConfig = null;
 
+  // DOM builder helpers for safe rendering without innerHTML
+  function el(tag, className, text, children) {
+    const element = document.createElement(tag);
+    if (className) {
+      className.split(' ').forEach(c => {
+        if (c.trim()) element.classList.add(c.trim());
+      });
+    }
+    if (text !== undefined && text !== null) {
+      element.textContent = text;
+    }
+    if (children) {
+      if (Array.isArray(children)) {
+        children.forEach(child => {
+          if (child) element.appendChild(child);
+        });
+      } else {
+        element.appendChild(children);
+      }
+    }
+    return element;
+  }
+
+  function makeIcon(name, style = {}) {
+    const icon = document.createElement('i');
+    icon.setAttribute('data-lucide', name);
+    Object.assign(icon.style, style);
+    return icon;
+  }
+
   // Initialize
   window.addEventListener('message', event => {
     const message = event.data;
@@ -74,7 +104,9 @@
       vscode.postMessage({ command: 'syncToCloud' });
       setTimeout(() => {
         syncBtn.disabled = false;
-        syncBtn.innerHTML = '<i data-lucide="cloud-upload" style="width:14px;height:14px;"></i> Sync Cloud';
+        syncBtn.innerText = '';
+        syncBtn.appendChild(makeIcon('cloud-upload', { width: '14px', height: '14px' }));
+        syncBtn.appendChild(document.createTextNode(' Sync Cloud'));
         if (typeof lucide !== 'undefined') { lucide.createIcons(); }
       }, 3000);
     });
@@ -116,8 +148,14 @@
     const projectsCount = Object.keys(stats.projects).length;
     document.getElementById('projects-value').innerText = projectsCount.toString();
 
-    // Update Goal Completion
-    updateGoalRing(stats.todayDuration);
+    // Update Goal Completion (P1: Yesterday active hours calculation fix)
+    if (range === 'today' || range === 'yesterday') {
+      updateGoalRing(stats.totalDuration);
+    } else {
+      const todaySessions = filterSessionsByRange(db.sessions, 'today');
+      const todayStats = aggregateStats(todaySessions);
+      updateGoalRing(todayStats.totalDuration);
+    }
 
     // Update Breakdown
     updateCategoryBreakdown(stats);
@@ -290,12 +328,11 @@
     categories.sort((a, b) => b.time - a.time);
 
     const list = document.getElementById('category-breakdown-list');
-    list.innerHTML = '';
+    list.innerText = '';
 
     categories.forEach(cat => {
       const pct = stats.totalDuration > 0 ? Math.round((cat.time / stats.totalDuration) * 100) : 0;
-      const item = document.createElement('div');
-      item.className = 'breakdown-item';
+      const item = el('div', 'breakdown-item');
       
       if (cat.time === 0) {
         item.style.opacity = '0.55';
@@ -307,39 +344,54 @@
         } else if (cat.class === 'ai') {
           emptyNote = 'AI interactions will appear here automatically';
         }
-        item.innerHTML = `
-          <div class="breakdown-label">
-            <div class="color-pill" style="background: var(--text-muted);"></div>
-            <span style="color: var(--text-muted);">${cat.name}</span>
-          </div>
-          <div class="breakdown-value" style="font-size: 11px; font-weight: normal; color: var(--text-muted);">${emptyNote}</div>
-        `;
+        
+        const pill = el('div', 'color-pill');
+        pill.style.background = 'var(--text-muted)';
+        
+        const labelSpan = el('span', null, cat.name);
+        labelSpan.style.color = 'var(--text-muted)';
+        
+        const labelDiv = el('div', 'breakdown-label', null, [pill, labelSpan]);
+        const valDiv = el('div', 'breakdown-value', emptyNote);
+        valDiv.style.fontSize = '11px';
+        valDiv.style.fontWeight = 'normal';
+        valDiv.style.color = 'var(--text-muted)';
+        
+        item.appendChild(labelDiv);
+        item.appendChild(valDiv);
       } else {
-        item.innerHTML = `
-          <div class="breakdown-label">
-            <div class="color-pill" style="background: ${cat.color};"></div>
-            <span>${cat.name}</span>
-          </div>
-          <div class="breakdown-value">${formatDuration(cat.time)} <span style="color: var(--text-secondary); font-size: 11px; font-weight: normal; margin-left: 4px;">${pct}%</span></div>
-        `;
+        const pill = el('div', 'color-pill');
+        pill.style.background = cat.color;
+        
+        const labelDiv = el('div', 'breakdown-label', null, [pill, el('span', null, cat.name)]);
+        
+        const pctSpan = el('span', null, ` ${pct}%`);
+        pctSpan.style.color = 'var(--text-secondary)';
+        pctSpan.style.fontSize = '11px';
+        pctSpan.style.fontWeight = 'normal';
+        pctSpan.style.marginLeft = '4px';
+        
+        const valDiv = el('div', 'breakdown-value', formatDuration(cat.time), pctSpan);
+        
+        item.appendChild(labelDiv);
+        item.appendChild(valDiv);
       }
       list.appendChild(item);
     });
 
     if (list.children.length === 0) {
-      list.innerHTML = `
-        <div class="empty-state-container">
-          <div class="empty-state-icon"><i data-lucide="bar-chart-2" style="width:24px;height:24px;"></i></div>
-          <div class="empty-state-title">No Activity Yet</div>
-          <div class="empty-state-subtitle">Your productivity breakdown will appear here once logged.</div>
-        </div>
-      `;
+      const icon = makeIcon('bar-chart-2', { width: '24px', height: '24px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      const titleDiv = el('div', 'empty-state-title', 'No Activity Yet');
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'Your productivity breakdown will appear here once logged.');
+      const container = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      list.appendChild(container);
     }
   }
 
   function updateLanguagesList(stats) {
     const list = document.getElementById('languages-table-list');
-    list.innerHTML = '';
+    list.innerText = '';
 
     const langs = Object.entries(stats.languages)
       .sort((a, b) => b[1] - a[1]);
@@ -349,37 +401,44 @@
     langs.forEach(([lang, time]) => {
       const pct = totalLangTime > 0 ? Math.round((time / totalLangTime) * 100) : 0;
       
-      const row = document.createElement('div');
-      row.className = 'table-row';
-      row.innerHTML = `
-        <div class="table-row-name" style="display: flex; align-items: center; gap: 8px;">
-          <div class="row-icon-container">
-            <i data-lucide="code" style="width:12px;height:12px;"></i>
-          </div>
-          <span>${lang}</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" style="width: ${pct}%;"></div>
-        </div>
-        <div style="font-size: 13px; font-weight: 600;">${formatDuration(time)} <span style="font-weight: normal; color: var(--text-secondary); font-size: 11px; margin-left: 4px;">${pct}%</span></div>
-      `;
+      const rowIcon = makeIcon('code', { width: '12px', height: '12px' });
+      const iconContainer = el('div', 'row-icon-container', null, rowIcon);
+      const nameDiv = el('div', 'table-row-name', null, [iconContainer, el('span', null, lang)]);
+      nameDiv.style.display = 'flex';
+      nameDiv.style.alignItems = 'center';
+      nameDiv.style.gap = '8px';
+
+      const bar = el('div', 'progress-bar');
+      bar.style.width = `${pct}%`;
+      const barContainer = el('div', 'progress-bar-container', null, bar);
+
+      const pctSpan = el('span', null, ` ${pct}%`);
+      pctSpan.style.fontWeight = 'normal';
+      pctSpan.style.color = 'var(--text-secondary)';
+      pctSpan.style.fontSize = '11px';
+      pctSpan.style.marginLeft = '4px';
+
+      const durationDiv = el('div', null, formatDuration(time), pctSpan);
+      durationDiv.style.fontSize = '13px';
+      durationDiv.style.fontWeight = '600';
+
+      const row = el('div', 'table-row', null, [nameDiv, barContainer, durationDiv]);
       list.appendChild(row);
     });
 
     if (langs.length === 0) {
-      list.innerHTML = `
-        <div class="empty-state-container">
-          <div class="empty-state-icon"><i data-lucide="braces" style="width:24px;height:24px;"></i></div>
-          <div class="empty-state-title">No Languages Tracked</div>
-          <div class="empty-state-subtitle">Start coding to see language insights.</div>
-        </div>
-      `;
+      const icon = makeIcon('braces', { width: '24px', height: '24px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      const titleDiv = el('div', 'empty-state-title', 'No Languages Tracked');
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'Start coding to see language insights.');
+      const container = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      list.appendChild(container);
     }
   }
 
   function updateProjectsList(stats) {
     const list = document.getElementById('projects-table-list');
-    list.innerHTML = '';
+    list.innerText = '';
 
     const projs = Object.entries(stats.projects)
       .sort((a, b) => b[1] - a[1]);
@@ -387,121 +446,136 @@
     projs.forEach(([proj, time]) => {
       const pct = stats.totalDuration > 0 ? Math.round((time / stats.totalDuration) * 100) : 0;
       
-      const row = document.createElement('div');
-      row.className = 'table-row';
-      row.innerHTML = `
-        <div class="table-row-name" style="display: flex; align-items: center; gap: 8px;">
-          <div class="row-icon-container">
-            <i data-lucide="folder" style="width:12px;height:12px;"></i>
-          </div>
-          <span>${proj}</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" style="width: ${pct}%;"></div>
-        </div>
-        <div style="font-size: 13px; font-weight: 600;">${formatDuration(time)} <span style="font-weight: normal; color: var(--text-secondary); font-size: 11px; margin-left: 4px;">${pct}%</span></div>
-      `;
+      const rowIcon = makeIcon('folder', { width: '12px', height: '12px' });
+      const iconContainer = el('div', 'row-icon-container', null, rowIcon);
+      const nameDiv = el('div', 'table-row-name', null, [iconContainer, el('span', null, proj)]);
+      nameDiv.style.display = 'flex';
+      nameDiv.style.alignItems = 'center';
+      nameDiv.style.gap = '8px';
+
+      const bar = el('div', 'progress-bar');
+      bar.style.width = `${pct}%`;
+      const barContainer = el('div', 'progress-bar-container', null, bar);
+
+      const pctSpan = el('span', null, ` ${pct}%`);
+      pctSpan.style.fontWeight = 'normal';
+      pctSpan.style.color = 'var(--text-secondary)';
+      pctSpan.style.fontSize = '11px';
+      pctSpan.style.marginLeft = '4px';
+
+      const durationDiv = el('div', null, formatDuration(time), pctSpan);
+      durationDiv.style.fontSize = '13px';
+      durationDiv.style.fontWeight = '600';
+
+      const row = el('div', 'table-row', null, [nameDiv, barContainer, durationDiv]);
       list.appendChild(row);
     });
 
     if (projs.length === 0) {
-      list.innerHTML = `
-        <div class="empty-state-container">
-          <div class="empty-state-icon"><i data-lucide="folder-git-2" style="width:24px;height:24px;"></i></div>
-          <div class="empty-state-title">No Workspaces Tracked</div>
-          <div class="empty-state-subtitle">Open workspace folders to begin tracking projects.</div>
-        </div>
-      `;
+      const icon = makeIcon('folder-git-2', { width: '24px', height: '24px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      const titleDiv = el('div', 'empty-state-title', 'No Workspaces Tracked');
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'Open workspace folders to begin tracking projects.');
+      const container = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      list.appendChild(container);
     }
   }
 
   function updateTerminalAIUsage(stats) {
     const container = document.querySelector('.terminal-ai-container');
     if (!container) return;
+    container.innerText = '';
 
-    let terminalHTML = '';
+    let terminalSection;
     if (stats.terminalTime === 0 && stats.terminalCommandsCount === 0) {
-      terminalHTML = `
-        <div class="terminal-ai-section">
-          <div class="empty-state-container" style="padding: 16px 8px;">
-            <div class="empty-state-icon" style="margin-bottom: 6px; color: var(--color-terminal); opacity: 0.7;"><i data-lucide="terminal" style="width:18px;height:18px;"></i></div>
-            <div class="empty-state-title" style="font-size: 12.5px;">No Terminal Usage</div>
-            <div class="empty-state-subtitle" style="font-size: 11px;">Open a terminal session to begin tracking.</div>
-          </div>
-        </div>
-      `;
+      const icon = makeIcon('terminal', { width: '18px', height: '18px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      iconDiv.style.marginBottom = '6px';
+      iconDiv.style.color = 'var(--color-terminal)';
+      iconDiv.style.opacity = '0.7';
+      const titleDiv = el('div', 'empty-state-title', 'No Terminal Usage');
+      titleDiv.style.fontSize = '12.5px';
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'Open a terminal session to begin tracking.');
+      subtitleDiv.style.fontSize = '11px';
+
+      const emptyContainer = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      emptyContainer.style.padding = '16px 8px';
+      
+      terminalSection = el('div', 'terminal-ai-section', null, emptyContainer);
     } else {
-      const termTrendIcon = stats.terminalCommandsCount > 0 ? 'trending-up' : 'trending-down';
+      const termIcon = makeIcon('terminal', { width: '14px', height: '14px' });
+      const termBadge = el('div', 'icon-badge terminal-badge', null, termIcon);
+      const labelSpan = el('span', 'usage-label', 'Terminal Active Time');
+      const labelGroup = el('div', 'row-label-group', null, [termBadge, labelSpan]);
+
+      const pulse = el('span', 'pulse-indicator terminal-pulse active-pulse');
+      pulse.setAttribute('title', 'Active');
+      pulse.style.backgroundColor = 'var(--color-terminal)';
+      pulse.style.boxShadow = '0 0 8px var(--color-terminal)';
+      const durationVal = el('strong', null, formatDuration(stats.terminalTime));
+      const valGroup = el('div', 'row-value-group', null, [pulse, durationVal]);
+      const row1 = el('div', 'terminal-ai-row', null, [labelGroup, valGroup]);
+
+      const termTrendIconName = stats.terminalCommandsCount > 0 ? 'trending-up' : 'trending-down';
       const termTrendClass = stats.terminalCommandsCount > 0 ? 'positive' : 'neutral';
       const termTrendText = stats.terminalCommandsCount > 0 ? 'active' : 'stable';
-      terminalHTML = `
-        <div class="terminal-ai-section">
-          <div class="terminal-ai-row">
-            <div class="row-label-group">
-              <div class="icon-badge terminal-badge">
-                <i data-lucide="terminal" style="width:14px;height:14px;"></i>
-              </div>
-              <span class="usage-label">Terminal Active Time</span>
-            </div>
-            <div class="row-value-group">
-              <span class="pulse-indicator terminal-pulse active-pulse" title="Active" style="background-color: var(--color-terminal); box-shadow: 0 0 8px var(--color-terminal);"></span>
-              <strong>${formatDuration(stats.terminalTime)}</strong>
-            </div>
-          </div>
-          <div class="terminal-ai-row secondary-row">
-            <span class="usage-sublabel">Commands Executed</span>
-            <div class="row-value-group">
-              <div class="mini-trend ${termTrendClass}"><i data-lucide="${termTrendIcon}" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> ${termTrendText}</div>
-              <strong class="muted-metric">${stats.terminalCommandsCount}</strong>
-            </div>
-          </div>
-        </div>
-      `;
+      const trendIcon = makeIcon(termTrendIconName, { width: '10px', height: '10px', display: 'inline-block', verticalAlign: 'middle', marginRight: '2px' });
+      const trendDiv = el('div', `mini-trend ${termTrendClass}`, null, [trendIcon, document.createTextNode(` ${termTrendText}`)]);
+
+      const cmdVal = el('strong', 'muted-metric', stats.terminalCommandsCount.toString());
+      const valGroup2 = el('div', 'row-value-group', null, [trendDiv, cmdVal]);
+
+      const row2 = el('div', 'terminal-ai-row secondary-row', null, [el('span', 'usage-sublabel', 'Commands Executed'), valGroup2]);
+
+      terminalSection = el('div', 'terminal-ai-section', null, [row1, row2]);
     }
 
-    let aiHTML = '';
+    let aiSection;
     const aiPercentage = stats.totalDuration > 0 ? Math.round((stats.aiTime / stats.totalDuration) * 100) : 0;
     if (stats.aiTime === 0) {
-      aiHTML = `
-        <div class="terminal-ai-section">
-          <div class="empty-state-container" style="padding: 16px 8px;">
-            <div class="empty-state-icon" style="margin-bottom: 6px; color: var(--color-ai); opacity: 0.7;"><i data-lucide="sparkles" style="width:18px;height:18px;"></i></div>
-            <div class="empty-state-title" style="font-size: 12.5px;">No AI Activity</div>
-            <div class="empty-state-subtitle" style="font-size: 11px;">AI interactions will appear here automatically.</div>
-          </div>
-        </div>
-      `;
+      const icon = makeIcon('sparkles', { width: '18px', height: '18px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      iconDiv.style.marginBottom = '6px';
+      iconDiv.style.color = 'var(--color-ai)';
+      iconDiv.style.opacity = '0.7';
+      const titleDiv = el('div', 'empty-state-title', 'No AI Activity');
+      titleDiv.style.fontSize = '12.5px';
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'AI interactions will appear here automatically.');
+      subtitleDiv.style.fontSize = '11px';
+
+      const emptyContainer = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      emptyContainer.style.padding = '16px 8px';
+      
+      aiSection = el('div', 'terminal-ai-section', null, emptyContainer);
     } else {
-      aiHTML = `
-        <div class="terminal-ai-section">
-          <div class="terminal-ai-row">
-            <div class="row-label-group">
-              <div class="icon-badge ai-badge">
-                <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
-              </div>
-              <span class="usage-label">AI Active Time</span>
-            </div>
-            <div class="row-value-group">
-              <span class="pulse-indicator ai-pulse active-pulse" title="Active" style="background-color: var(--color-ai); box-shadow: 0 0 8px var(--color-ai);"></span>
-              <strong>${formatDuration(stats.aiTime)}</strong>
-            </div>
-          </div>
-          <div class="terminal-ai-row secondary-row">
-            <span class="usage-sublabel">AI Code Assistance</span>
-            <div class="row-value-group">
-              <div class="mini-trend positive"><i data-lucide="trending-up" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> +${Math.round(aiPercentage * 0.2) || 1}%</div>
-              <strong class="muted-metric">${aiPercentage}%</strong>
-            </div>
-          </div>
-        </div>
-      `;
+      const aiIcon = makeIcon('sparkles', { width: '14px', height: '14px' });
+      const aiBadge = el('div', 'icon-badge ai-badge', null, aiIcon);
+      const labelSpan = el('span', 'usage-label', 'AI Active Time');
+      const labelGroup = el('div', 'row-label-group', null, [aiBadge, labelSpan]);
+
+      const pulse = el('span', 'pulse-indicator ai-pulse active-pulse');
+      pulse.setAttribute('title', 'Active');
+      pulse.style.backgroundColor = 'var(--color-ai)';
+      pulse.style.boxShadow = '0 0 8px var(--color-ai)';
+      const durationVal = el('strong', null, formatDuration(stats.aiTime));
+      const valGroup = el('div', 'row-value-group', null, [pulse, durationVal]);
+      const row1 = el('div', 'terminal-ai-row', null, [labelGroup, valGroup]);
+
+      const trendIcon = makeIcon('trending-up', { width: '10px', height: '10px', display: 'inline-block', verticalAlign: 'middle', marginRight: '2px' });
+      const trendDiv = el('div', 'mini-trend positive', null, [trendIcon, document.createTextNode(` +${Math.round(aiPercentage * 0.2) || 1}%`)]);
+
+      const aiVal = el('strong', 'muted-metric', `${aiPercentage}%`);
+      const valGroup2 = el('div', 'row-value-group', null, [trendDiv, aiVal]);
+
+      const row2 = el('div', 'terminal-ai-row secondary-row', null, [el('span', 'usage-sublabel', 'AI Code Assistance'), valGroup2]);
+
+      aiSection = el('div', 'terminal-ai-section', null, [row1, row2]);
     }
 
-    container.innerHTML = `
-      ${terminalHTML}
-      <div class="widget-divider"></div>
-      ${aiHTML}
-    `;
+    const divider = el('div', 'widget-divider');
+    container.appendChild(terminalSection);
+    container.appendChild(divider);
+    container.appendChild(aiSection);
   }
 
   function updateFilesList(aggregatedStats = null) {
@@ -514,7 +588,7 @@
       stats = aggregateStats(filtered);
     }
 
-    list.innerHTML = '';
+    list.innerText = '';
     const query = fileSearchInput.value.toLowerCase().trim();
 
     let files = Object.values(stats.files)
@@ -525,38 +599,81 @@
     }
 
     files.forEach(f => {
-      const row = document.createElement('div');
-      row.className = 'table-row';
+      const row = el('div', 'table-row');
       row.style.marginBottom = '6px';
-      row.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden; padding-right: 12px;">
-          <div class="row-icon-container">
-            <i data-lucide="file-text" style="width:12px;height:12px;"></i>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
-            <div class="table-row-name" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${f.fileName}</div>
-            <div style="font-size: 11px; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${f.relativePath}</div>
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 16px; min-width: 160px; justify-content: flex-end;">
-          <div style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-            <span style="display: flex; align-items: center; gap: 3px;"><i data-lucide="pencil" style="width:10px;height:10px;"></i> ${f.editsCount}</span>
-            <span style="display: flex; align-items: center; gap: 3px;"><i data-lucide="book-open" style="width:10px;height:10px;"></i> ${f.readsCount}</span>
-          </div>
-          <strong style="font-size: 13px; color: var(--text-primary); min-width: 50px; text-align: right;">${formatDuration(f.timeSpent)}</strong>
-        </div>
-      `;
+      
+      const fileIcon = makeIcon('file-text', { width: '12px', height: '12px' });
+      const iconContainer = el('div', 'row-icon-container', null, fileIcon);
+      const nameDiv = el('div', 'table-row-name', f.fileName);
+      nameDiv.style.textOverflow = 'ellipsis';
+      nameDiv.style.overflow = 'hidden';
+      nameDiv.style.whiteSpace = 'nowrap';
+      
+      const relPathDiv = el('div', null, f.relativePath);
+      relPathDiv.style.fontSize = '11px';
+      relPathDiv.style.color = 'var(--text-secondary)';
+      relPathDiv.style.textOverflow = 'ellipsis';
+      relPathDiv.style.overflow = 'hidden';
+      relPathDiv.style.whiteSpace = 'nowrap';
+
+      const detailsDiv = el('div', null, null, [nameDiv, relPathDiv]);
+      detailsDiv.style.display = 'flex';
+      detailsDiv.style.flexDirection = 'column';
+      detailsDiv.style.gap = '2px';
+      detailsDiv.style.overflow = 'hidden';
+
+      const leftCol = el('div', null, null, [iconContainer, detailsDiv]);
+      leftCol.style.display = 'flex';
+      leftCol.style.alignItems = 'center';
+      leftCol.style.gap = '10px';
+      leftCol.style.flex = '1';
+      leftCol.style.overflow = 'hidden';
+      leftCol.style.paddingRight = '12px';
+
+      const editIcon = makeIcon('pencil', { width: '10px', height: '10px' });
+      const editSpan = el('span', null, null, [editIcon, document.createTextNode(` ${f.editsCount}`)]);
+      editSpan.style.display = 'flex';
+      editSpan.style.alignItems = 'center';
+      editSpan.style.gap = '3px';
+
+      const readIcon = makeIcon('book-open', { width: '10px', height: '10px' });
+      const readSpan = el('span', null, null, [readIcon, document.createTextNode(` ${f.readsCount}`)]);
+      readSpan.style.display = 'flex';
+      readSpan.style.alignItems = 'center';
+      readSpan.style.gap = '3px';
+
+      const countsDiv = el('div', null, null, [editSpan, readSpan]);
+      countsDiv.style.fontSize = '11px';
+      countsDiv.style.color = 'var(--text-secondary)';
+      countsDiv.style.display = 'flex';
+      countsDiv.style.alignItems = 'center';
+      countsDiv.style.gap = '8px';
+
+      const durationStr = el('strong', null, formatDuration(f.timeSpent));
+      durationStr.style.fontSize = '13px';
+      durationStr.style.color = 'var(--text-primary)';
+      durationStr.style.minWidth = '50px';
+      durationStr.style.textAlign = 'right';
+
+      const rightCol = el('div', null, null, [countsDiv, durationStr]);
+      rightCol.style.display = 'flex';
+      rightCol.style.alignItems = 'center';
+      rightCol.style.gap = '16px';
+      rightCol.style.minWidth = '160px';
+      rightCol.style.justifyContent = 'flex-end';
+
+      row.appendChild(leftCol);
+      row.appendChild(rightCol);
       list.appendChild(row);
     });
 
     if (files.length === 0) {
-      list.innerHTML = `
-        <div class="empty-state-container">
-          <div class="empty-state-icon"><i data-lucide="file-warning" style="width:24px;height:24px;"></i></div>
-          <div class="empty-state-title">No Matching Files</div>
-          <div class="empty-state-subtitle">No files found matching "${query}" in this range.</div>
-        </div>
-      `;
+      const icon = makeIcon('file-warning', { width: '24px', height: '24px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      const titleDiv = el('div', 'empty-state-title', 'No Matching Files');
+      const subtitleDiv = el('div', 'empty-state-subtitle', `No files found matching "${query}" in this range.`);
+      const container = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      list.appendChild(container);
     }
 
     // Call lucide trigger since search dynamically inserts icons
@@ -567,7 +684,7 @@
 
   function updateTimelineList(sessions) {
     const list = document.getElementById('timeline-list');
-    list.innerHTML = '';
+    list.innerText = '';
 
     // Collect and sort all timeline events from these sessions
     const events = [];
@@ -591,8 +708,7 @@
       const timeStr = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       const dateStr = new Date(evt.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
       
-      const item = document.createElement('div');
-      item.className = 'timeline-item';
+      const item = el('div', 'timeline-item');
       
       let color = 'var(--color-primary)';
       if (evt.category === 'coding') { color = 'var(--color-coding)'; }
@@ -604,28 +720,35 @@
       else if (evt.category === 'ai') { color = 'var(--color-ai)'; }
       else if (evt.category === 'idle') { color = 'var(--text-secondary)'; }
 
-      item.innerHTML = `
-        <div class="timeline-dot" style="background: ${color}; box-shadow: 0 0 6px ${color};"></div>
-        <div class="timeline-time">${dateStr} ${timeStr} <span style="color: var(--text-secondary);">(${evt.projectName})</span></div>
-        <div class="timeline-desc">${evt.description}</div>
-      `;
+      const dot = el('div', 'timeline-dot');
+      dot.style.background = color;
+      dot.style.boxShadow = `0 0 6px ${color}`;
+
+      const projSpan = el('span', null, `(${evt.projectName})`);
+      projSpan.style.color = 'var(--text-secondary)';
+      const timeDiv = el('div', 'timeline-time', `${dateStr} ${timeStr} `, projSpan);
+
+      const descDiv = el('div', 'timeline-desc', evt.description);
+
+      item.appendChild(dot);
+      item.appendChild(timeDiv);
+      item.appendChild(descDiv);
       list.appendChild(item);
     });
 
     if (latestEvents.length === 0) {
-      list.innerHTML = `
-        <div class="empty-state-container">
-          <div class="empty-state-icon"><i data-lucide="history" style="width:24px;height:24px;"></i></div>
-          <div class="empty-state-title">No History Recorded</div>
-          <div class="empty-state-subtitle">No timeline events have been logged for this period.</div>
-        </div>
-      `;
+      const icon = makeIcon('history', { width: '24px', height: '24px' });
+      const iconDiv = el('div', 'empty-state-icon', null, icon);
+      const titleDiv = el('div', 'empty-state-title', 'No History Recorded');
+      const subtitleDiv = el('div', 'empty-state-subtitle', 'No timeline events have been logged for this period.');
+      const container = el('div', 'empty-state-container', null, [iconDiv, titleDiv, subtitleDiv]);
+      list.appendChild(container);
     }
   }
 
   function renderHeatmap() {
     const grid = document.getElementById('heatmap-grid');
-    grid.innerHTML = '';
+    grid.innerText = '';
 
     // Create days array for the last 365 days (53 weeks)
     const now = new Date();
@@ -655,15 +778,17 @@
         else { level = 4; }                      // >= 4 hrs
       }
 
-      const cell = document.createElement('div');
-      cell.className = `heatmap-day level-${level}`;
+      const cell = el('div', `heatmap-day level-${level}`);
       
       // Hover listeners for custom tooltip
       cell.addEventListener('mouseenter', (e) => {
         const dateFormatted = currentDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
         const timeFormatted = formatDuration(devTime);
         
-        tooltip.innerHTML = `<strong>${dateFormatted}</strong><br>${timeFormatted} logged`;
+        tooltip.innerText = '';
+        tooltip.appendChild(el('strong', null, dateFormatted));
+        tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(`${timeFormatted} logged`));
         tooltip.style.display = 'block';
         
         // Position tooltip

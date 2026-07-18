@@ -71,7 +71,7 @@ export class GitTracker {
     }
   }
 
-  public getRepoDetails(): { repository: string, branch: string } {
+  public getRepoDetails(privacyMode: boolean = false): { repository: string, branch: string } {
     if (!this.gitApi || this.gitApi.repositories.length === 0) {
       return { repository: '', branch: '' };
     }
@@ -84,8 +84,28 @@ export class GitTracker {
       repository = path.basename(repo.rootUri.fsPath);
     }
     
-    const branch = (repo && repo.state.HEAD) ? repo.state.HEAD.name || '' : '';
+    let branch = (repo && repo.state.HEAD) ? repo.state.HEAD.name || '' : '';
+
+    if (privacyMode) {
+      if (repository) {
+        repository = `repo_${this.simpleHash(repository)}`;
+      }
+      if (branch) {
+        branch = `branch_${this.simpleHash(branch)}`;
+      }
+    }
+    
     return { repository, branch };
+  }
+
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).slice(0, 6).toUpperCase();
   }
 
   public dispose() {

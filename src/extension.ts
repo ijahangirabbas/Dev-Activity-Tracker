@@ -18,13 +18,13 @@ export function activate(context: vscode.ExtensionContext) {
   const dbService = new DatabaseService(storagePath);
 
   // Start local API server for dashboard web client integrations
-  localServer = new LocalServer(dbService, () => {
+  localServer = new LocalServer(context, dbService, () => {
     if (tracker) {
       return tracker.getLiveDatabase();
     }
     return dbService.getDatabase();
   });
-  localServer.start();
+  localServer.start().catch(err => console.error('Failed to start LocalServer:', err));
 
   // Initialize status bar manager
   statusBarManager = new StatusbarManager(dbService);
@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Listen for config changes to dynamically update settings
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('devActivityTracker')) {
+      if (e.affectsConfiguration('devTracker')) {
         if (tracker) {
           tracker.updateConfig();
         }
@@ -58,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  console.log('Developer Activity & Coding Analytics extension deactivating...');
+  console.log('DevTracker extension deactivating...');
   
   if (localServer) {
     localServer.stop();

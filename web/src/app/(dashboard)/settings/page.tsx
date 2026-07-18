@@ -20,12 +20,14 @@ export default function SettingsPage() {
   const [autoSync, setAutoSync] = useState(true);
   const [isLocalOnline, setIsLocalOnline] = useState(false);
   const [lastChecked, setLastChecked] = useState<string>('Not checked yet');
+  const [bridgeToken, setBridgeToken] = useState('');
 
   const userId = user?.id || '';
 
   const checkLocal = async () => {
     try {
-      const res = await fetch('http://localhost:54321/api/data');
+      const token = localStorage.getItem('dev_tracker_bridge_token') || '';
+      const res = await fetch(`http://localhost:54321/api/data?token=${encodeURIComponent(token)}`);
       setIsLocalOnline(res.ok);
     } catch (e) {
       setIsLocalOnline(false);
@@ -37,8 +39,20 @@ export default function SettingsPage() {
   useEffect(() => {
     const savedAutoSync = localStorage.getItem('dev_tracker_auto_sync') !== 'false';
     setAutoSync(savedAutoSync);
-    checkLocal();
+    
+    const savedToken = localStorage.getItem('dev_tracker_bridge_token') || '';
+    setBridgeToken(savedToken);
+
+    fetch(`http://localhost:54321/api/data?token=${encodeURIComponent(savedToken)}`)
+      .then(res => setIsLocalOnline(res.ok))
+      .catch(() => setIsLocalOnline(false))
+      .finally(() => setLastChecked(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
   }, []);
+
+  const handleBridgeTokenChange = (val: string) => {
+    setBridgeToken(val);
+    localStorage.setItem('dev_tracker_bridge_token', val);
+  };
 
   const handleAutoSyncToggle = (checked: boolean) => {
     setAutoSync(checked);
@@ -75,7 +89,7 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-base font-bold text-text-primary">Your User Connection UUID</h2>
               <p className="mt-1 text-xs leading-5 text-text-secondary">
-                Paste this value into VS Code setting <span className="font-mono text-accent-primary">devActivityTracker.userId</span>.
+                Paste this value into VS Code setting <span className="font-mono text-accent-primary">devTracker.userId</span>.
               </p>
             </div>
           </div>
@@ -123,6 +137,20 @@ export default function SettingsPage() {
               </label>
             </div>
 
+            <div className="flex flex-col gap-3 rounded-lg border border-border-default bg-card-hover-bg/25 p-4">
+              <div>
+                <h3 className="text-xs font-bold text-text-primary">VS Code Extension Pairing Token</h3>
+                <p className="mt-1 text-[11px] text-text-secondary">Paste your generated pairing token from the VS Code dashboard settings to authenticate connection.</p>
+              </div>
+              <input
+                type="password"
+                placeholder="Paste extension pairing token here"
+                value={bridgeToken}
+                onChange={(e) => handleBridgeTokenChange(e.target.value)}
+                className="w-full rounded-lg border border-border-default bg-canvas p-2.5 font-mono text-xs text-text-primary outline-none focus:border-accent-primary"
+              />
+            </div>
+
             <div className="flex flex-col gap-3 rounded-lg border border-border-default bg-card-hover-bg/25 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-xs font-bold text-text-primary">VS Code local bridge</h3>
@@ -160,10 +188,10 @@ export default function SettingsPage() {
 
           <div className="space-y-4">
             {[
-              ['1', 'Open VS Code Settings and search Developer Activity.'],
-              ['2', 'Paste your UUID into devActivityTracker.userId.'],
-              ['3', 'Keep coding locally. The offline VS Code dashboard still works.'],
-              ['4', 'Open this dashboard and use Sync Now when Local Live is available.'],
+              ['1', 'Open VS Code Settings and search DevTracker.'],
+              ['2', 'Paste your Connection UUID into devTracker.userId.'],
+              ['3', 'Run command DevTracker: Show Dashboard in VS Code.'],
+              ['4', 'Copy the pairing token from the VS Code dashboard and paste it on the left.'],
             ].map(([step, text]) => (
               <div key={step} className="flex gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-accent-primary/20 bg-accent-primary/10 text-xs font-bold text-accent-primary">
@@ -179,7 +207,7 @@ export default function SettingsPage() {
               <ClipboardCheck size={14} className="text-accent-green" />
               Field to update
             </div>
-            <div className="font-mono text-[11px] text-accent-primary">devActivityTracker.userId</div>
+            <div className="font-mono text-[11px] text-accent-primary">devTracker.userId</div>
           </div>
         </aside>
       </div>

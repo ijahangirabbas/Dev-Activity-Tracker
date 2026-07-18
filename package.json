@@ -1,6 +1,6 @@
 {
-  "name": "dev-activity-tracker",
-  "displayName": "Developer Activity & Coding Analytics",
+  "name": "devtracker",
+  "displayName": "DevTracker",
   "description": "Automatically tracks coding, reading, debugging, git operations, and terminal usage with local-first detailed analytics and a premium interactive dashboard.",
   "version": "1.0.1",
   "publisher": "jeem-labs",
@@ -31,46 +31,46 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onCommand:dev-activity-tracker.showDashboard",
-    "onCommand:dev-activity-tracker.exportData",
-    "onCommand:dev-activity-tracker.backupData",
-    "onCommand:dev-activity-tracker.restoreData",
-    "onCommand:dev-activity-tracker.syncToCloud",
+    "onCommand:devtracker.showDashboard",
+    "onCommand:devtracker.exportData",
+    "onCommand:devtracker.backupData",
+    "onCommand:devtracker.restoreData",
+    "onCommand:devtracker.syncToCloud",
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "dev-activity-tracker.showDashboard",
-        "title": "Developer Activity: Show Analytics Dashboard",
-        "category": "Developer Activity"
+        "command": "devtracker.showDashboard",
+        "title": "DevTracker: Show Analytics Dashboard",
+        "category": "DevTracker"
       },
       {
-        "command": "dev-activity-tracker.exportData",
-        "title": "Developer Activity: Export Analytics Data",
-        "category": "Developer Activity"
+        "command": "devtracker.exportData",
+        "title": "DevTracker: Export Analytics Data",
+        "category": "DevTracker"
       },
       {
-        "command": "dev-activity-tracker.backupData",
-        "title": "Developer Activity: Backup Data",
-        "category": "Developer Activity"
+        "command": "devtracker.backupData",
+        "title": "DevTracker: Backup Data",
+        "category": "DevTracker"
       },
       {
-        "command": "dev-activity-tracker.restoreData",
-        "title": "Developer Activity: Restore Data",
-        "category": "Developer Activity"
+        "command": "devtracker.restoreData",
+        "title": "DevTracker: Restore Data",
+        "category": "DevTracker"
       },
       {
-        "command": "dev-activity-tracker.syncToCloud",
-        "title": "Developer Activity: Sync Data to Cloud (Supabase)",
-        "category": "Developer Activity"
+        "command": "devtracker.syncToCloud",
+        "title": "DevTracker: Sync Data to Cloud (Supabase)",
+        "category": "DevTracker"
       }
     ],
     "configuration": {
-      "title": "Developer Activity Tracker",
+      "title": "DevTracker",
       "properties": {
-        "devActivityTracker.idleTimeout": {
+        "devTracker.idleTimeout": {
           "type": "integer",
           "default": 300,
           "enum": [
@@ -89,22 +89,27 @@
           ],
           "description": "Idle timeout in seconds (when tracking will pause)."
         },
-        "devActivityTracker.dailyGoal": {
+        "devTracker.dailyGoal": {
           "type": "integer",
           "default": 14400,
           "description": "Daily development time goal in seconds (default is 4 hours)."
         },
-        "devActivityTracker.privacyMode": {
+        "devTracker.privacyMode": {
           "type": "boolean",
           "default": false,
           "description": "Privacy Mode: If true, obscure specific file names and workspace paths in logs."
         },
-        "devActivityTracker.showStatusBar": {
+        "devTracker.recordRawTerminalCommands": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, records the actual command line executed in terminal events. If false or in Privacy Mode, only the command category (e.g., git, build, test) is stored, and common secrets are redacted."
+        },
+        "devTracker.showStatusBar": {
           "type": "boolean",
           "default": true,
           "description": "Show activity status in the status bar."
         },
-        "devActivityTracker.userId": {
+        "devTracker.userId": {
           "type": "string",
           "default": "",
           "description": "Your cloud dashboard user UUID. Copy it from https://dev-activity-tracker-zeta.vercel.app/dashboard?tab=settings to sync local extension data to your account."
@@ -122,6 +127,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.1",
     "typescript": "^5.3.3"
   }

@@ -116,7 +116,7 @@ export default function LoginPage() {
           </div>
 
           <div className="rounded-lg border border-border-default bg-canvas p-4 font-mono text-xs text-text-secondary">
-            devActivityTracker.userId = <span className="text-accent-primary">your-account-uuid</span>
+            devTracker.userId = <span className="text-accent-primary">your-account-uuid</span>
           </div>
         </section>
 

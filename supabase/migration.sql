@@ -89,15 +89,18 @@ ALTER TABLE dev_streaks          ENABLE ROW LEVEL SECURITY;
 
 -- Sessions policies
 CREATE POLICY "sessions_self_access" ON dev_sessions
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Daily progress policies
 CREATE POLICY "daily_self_access" ON dev_daily_progress
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Streaks policies
 CREATE POLICY "streaks_self_access" ON dev_streaks
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- =============================================
 -- Useful Indexes for dashboard queries
@@ -107,10 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_workspace      ON dev_sessions (user_id,
 CREATE INDEX IF NOT EXISTS idx_daily_user_date         ON dev_daily_progress (user_id, date DESC);
 
 -- =============================================
--- Done! Copy your Project URL and service_role
--- key from Supabase → Settings → API and put
--- them in VS Code Settings as:
---   devActivityTracker.supabaseUrl
---   devActivityTracker.supabaseServiceKey
---   devActivityTracker.supabaseUserId
+-- Done! Setup complete.
+-- The DevTracker extension does not need your Supabase credentials directly.
+-- Instead, pairing is handled securely via UUID and pairing token in settings.
 -- =============================================
