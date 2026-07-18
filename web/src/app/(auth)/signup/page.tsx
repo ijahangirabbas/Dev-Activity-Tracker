@@ -1,16 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from 'web/lib/supabase';
-import { Sparkles, Mail, Lock, ShieldAlert, Check, Loader2, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldAlert,
+  Sparkles,
+} from 'lucide-react';
 
 const signupSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address' }),
+  email: z.string().email({ message: 'Enter a valid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -29,22 +38,18 @@ export default function SignupPage() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const root = window.document.documentElement;
-    if (savedTheme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
+    root.classList.toggle('dark', savedTheme === 'dark');
+    root.classList.toggle('light', savedTheme !== 'dark');
   }, []);
 
   const { register, handleSubmit, formState: { errors } } = useForm<SignupInput>({
-    resolver: zodResolver(signupSchema)
+    resolver: zodResolver(signupSchema),
   });
 
   const onSubmit = async (data: SignupInput) => {
     setIsLoading(true);
     setError(null);
+
     try {
       const { data: authData, error: signupErr } = await supabase.auth.signUp({
         email: data.email,
@@ -53,158 +58,169 @@ export default function SignupPage() {
 
       if (signupErr) {
         setError(signupErr.message);
+        return;
+      }
+
+      if (authData.session) {
+        navigate('/dashboard', { replace: true });
       } else {
-        if (authData.session) {
-          navigate('/dashboard');
-        } else {
-          setSuccess(true);
-        }
+        setSuccess(true);
       }
     } catch (e: any) {
-      setError(e.message || 'An unexpected error occurred');
+      setError(e.message || 'Account creation failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas text-text-body px-4 py-12 relative overflow-hidden transition-colors duration-500">
-      {/* Subtle background graphics */}
+    <div className="min-h-screen bg-canvas text-text-body px-4 py-8 flex items-center justify-center relative overflow-hidden">
       <div className="noise-overlay" />
-      <div className="absolute inset-0 mesh-grid pointer-events-none -z-10 opacity-40" />
+      <div className="absolute inset-0 mesh-grid pointer-events-none opacity-60" />
 
-      {/* Dynamic light sources */}
-      <div className="absolute top-[20%] right-[30%] w-[350px] h-[350px] bg-accent-primary/10 blur-[120px] rounded-full pointer-events-none -z-10 animate-pulse-glow" />
-      <div className="absolute bottom-[20%] left-[30%] w-[400px] h-[400px] bg-accent-purple/5 blur-[150px] rounded-full pointer-events-none -z-10 animate-pulse-glow" />
-
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.98, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="w-full max-w-md rounded-3xl border border-card-border bg-card-bg/60 backdrop-blur-2xl p-8 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] relative z-10"
-      >
-        {/* Animated accent top border */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-accent-primary via-accent-purple to-accent-cyan rounded-t-3xl" />
-
-        {/* Brand Header */}
-        <div className="flex flex-col items-center mb-8 text-center">
-          <Link to="/" className="flex items-center gap-3 mb-4 group">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-accent-primary to-accent-purple flex items-center justify-center transition-all group-hover:scale-105 duration-300 shadow-lg shadow-accent-primary/20">
-              <Sparkles size={22} className="text-white" />
-            </div>
-            <span className="font-extrabold text-xl tracking-wider uppercase text-text-primary font-sans">Dev Tracker</span>
+      <div className="relative z-10 w-full max-w-5xl grid lg:grid-cols-[1fr_440px] gap-6 items-stretch">
+        <section className="hidden lg:flex rounded-lg border border-border-default bg-card-bg p-8 flex-col justify-between min-h-[660px]">
+          <Link to="/" className="inline-flex items-center gap-3 w-fit">
+            <span className="w-9 h-9 rounded-lg bg-accent-primary text-white flex items-center justify-center">
+              <Sparkles size={18} />
+            </span>
+            <span className="text-sm font-extrabold tracking-wider uppercase text-text-primary">Dev Tracker</span>
           </Link>
-          <h2 className="text-2xl font-bold font-serif text-text-primary tracking-tight">Create Web Account</h2>
-          <p className="text-xs text-text-secondary mt-1.5 max-w-xs leading-relaxed">Unlock cloud dashboard sync and rolling backups</p>
-        </div>
 
-        {/* Success State */}
-        {success ? (
-          <div className="text-center py-6">
-            <div className="w-16 h-16 bg-accent-green/10 border border-accent-green/20 text-accent-green rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-accent-green/10">
-              <Check size={28} />
+          <div className="space-y-6 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-accent-primary/20 bg-accent-primary/10 px-3 py-1.5 text-xs font-semibold text-accent-primary">
+              <KeyRound size={14} />
+              One UUID connects VS Code to cloud analytics
             </div>
-            <h3 className="text-xl font-bold text-text-primary">Check Your Email</h3>
-            <p className="text-xs text-text-secondary mt-3 leading-relaxed max-w-xs mx-auto">
-              We sent a verification link to your email address. Please click it to complete registration.
-            </p>
-            <Link
-              to="/login"
-              className="mt-8 inline-flex items-center justify-center w-full px-6 py-3 bg-gradient-to-r from-accent-primary to-accent-primary-hover hover:from-accent-primary-hover hover:to-accent-primary font-bold text-xs rounded-xl text-white transition-all shadow-md shadow-accent-primary/15"
-            >
-              Back to Login
-            </Link>
+            <div>
+              <h1 className="text-4xl font-bold text-text-primary leading-tight">Create your cloud dashboard account.</h1>
+              <p className="mt-3 text-sm text-text-secondary leading-6">
+                Your extension keeps tracking locally. This account gives you a private dashboard UUID for optional Supabase sync and web analytics.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {[
+                'No Supabase service key in VS Code',
+                'Offline VS Code dashboard remains available',
+                'Cloud dashboard requires sign-in',
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3 text-sm font-semibold text-text-primary">
+                  <CheckCircle2 size={16} className="text-accent-green" />
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
-        ) : (
-          <>
-            {/* Error Alert */}
-            {error && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mb-6 p-4 rounded-xl bg-accent-red/10 border border-accent-red/20 text-accent-red text-xs flex gap-3 items-start"
+
+          <div className="rounded-lg border border-border-default bg-canvas p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Setup after signup</div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-text-secondary">
+              <span>Sign in</span>
+              <span>Copy UUID</span>
+              <span>Paste in VS Code</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-border-default bg-card-bg p-6 sm:p-8 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.6)]">
+          <div className="mb-8">
+            <Link to="/" className="lg:hidden inline-flex items-center gap-2 mb-6">
+              <span className="w-8 h-8 rounded-lg bg-accent-primary text-white flex items-center justify-center">
+                <Sparkles size={16} />
+              </span>
+              <span className="text-sm font-extrabold tracking-wider uppercase text-text-primary">Dev Tracker</span>
+            </Link>
+            <h2 className="text-2xl font-bold text-text-primary">Create account</h2>
+            <p className="text-sm text-text-secondary mt-2">Use this account to access the hosted dashboard.</p>
+          </div>
+
+          {success ? (
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-lg border border-accent-green/25 bg-accent-green/10 text-accent-green">
+                <Check size={26} />
+              </div>
+              <h3 className="text-xl font-bold text-text-primary">Check your email</h3>
+              <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-text-secondary">
+                Confirm your email, then sign in and copy your UUID from dashboard settings.
+              </p>
+              <Link
+                to="/signin"
+                className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-accent-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-accent-primary-hover"
               >
-                <ShieldAlert size={18} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-
-            {/* Registration Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Email Address</label>
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted group-focus-within:text-accent-primary transition-colors">
-                    <Mail size={15} />
-                  </span>
-                  <input
-                    type="email"
-                    {...register('email')}
-                    placeholder="developer@domain.com"
-                    className="w-full bg-card-bg/40 border border-border-default hover:border-border-hover focus:border-accent-primary rounded-xl pl-11 pr-4 py-3 text-xs text-text-primary placeholder-text-muted/50 focus:outline-none transition-all duration-300"
-                  />
-                </div>
-                {errors.email && <span className="text-[10px] text-accent-red/90 font-medium block mt-1">{errors.email.message}</span>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Password</label>
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted group-focus-within:text-accent-primary transition-colors">
-                    <Lock size={15} />
-                  </span>
-                  <input
-                    type="password"
-                    {...register('password')}
-                    placeholder="••••••••"
-                    className="w-full bg-card-bg/40 border border-border-default hover:border-border-hover focus:border-accent-primary rounded-xl pl-11 pr-4 py-3 text-xs text-text-primary placeholder-text-muted/50 focus:outline-none transition-all duration-300"
-                  />
-                </div>
-                {errors.password && <span className="text-[10px] text-accent-red/90 font-medium block mt-1">{errors.password.message}</span>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Confirm Password</label>
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted group-focus-within:text-accent-primary transition-colors">
-                    <Lock size={15} />
-                  </span>
-                  <input
-                    type="password"
-                    {...register('confirmPassword')}
-                    placeholder="••••••••"
-                    className="w-full bg-card-bg/40 border border-border-default hover:border-border-hover focus:border-accent-primary rounded-xl pl-11 pr-4 py-3 text-xs text-text-primary placeholder-text-muted/50 focus:outline-none transition-all duration-300"
-                  />
-                </div>
-                {errors.confirmPassword && <span className="text-[10px] text-accent-red/90 font-medium block mt-1">{errors.confirmPassword.message}</span>}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary to-accent-primary-hover hover:from-accent-primary-hover hover:to-accent-primary disabled:opacity-60 text-white font-bold text-xs py-3.5 rounded-xl shadow-lg shadow-accent-primary/20 active:scale-[0.98] transition-all duration-300 cursor-pointer disabled:cursor-not-allowed mt-2"
-              >
-                {isLoading ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <>
-                    <span>Create Free Account</span>
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Redirect to Signin */}
-            <div className="text-center mt-8 text-xs text-text-secondary">
-              Already have an account?{' '}
-              <Link to="/login" className="font-bold text-accent-primary hover:text-accent-primary-hover transition-colors">
-                Sign In
+                Go to sign in
               </Link>
             </div>
-          </>
-        )}
-      </motion.div>
+          ) : (
+            <>
+              {error && (
+                <div className="mb-5 rounded-lg border border-accent-red/25 bg-accent-red/10 p-3 text-xs text-accent-red flex gap-2">
+                  <ShieldAlert size={16} className="shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Email</label>
+                  <div className="relative mt-1.5">
+                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="email"
+                      {...register('email')}
+                      placeholder="you@company.com"
+                      className="w-full rounded-lg border border-border-default bg-canvas py-3 pl-10 pr-3 text-sm text-text-primary outline-none transition focus:border-accent-primary"
+                    />
+                  </div>
+                  {errors.email && <p className="mt-1 text-[11px] text-accent-red">{errors.email.message}</p>}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Password</label>
+                  <div className="relative mt-1.5">
+                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="password"
+                      {...register('password')}
+                      placeholder="Password"
+                      className="w-full rounded-lg border border-border-default bg-canvas py-3 pl-10 pr-3 text-sm text-text-primary outline-none transition focus:border-accent-primary"
+                    />
+                  </div>
+                  {errors.password && <p className="mt-1 text-[11px] text-accent-red">{errors.password.message}</p>}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Confirm password</label>
+                  <div className="relative mt-1.5">
+                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="password"
+                      {...register('confirmPassword')}
+                      placeholder="Confirm password"
+                      className="w-full rounded-lg border border-border-default bg-canvas py-3 pl-10 pr-3 text-sm text-text-primary outline-none transition focus:border-accent-primary"
+                    />
+                  </div>
+                  {errors.confirmPassword && <p className="mt-1 text-[11px] text-accent-red">{errors.confirmPassword.message}</p>}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full rounded-lg bg-accent-primary px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2 transition hover:bg-accent-primary-hover disabled:opacity-60"
+                >
+                  {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><span>Create account</span><ArrowRight size={16} /></>}
+                </button>
+              </form>
+
+              <p className="mt-8 text-center text-sm text-text-secondary">
+                Already have an account?{' '}
+                <Link to="/signin" className="font-bold text-accent-primary hover:text-accent-primary-hover">
+                  Sign in
+                </Link>
+              </p>
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { Tracker } from '../tracking/tracker';
 import { DashboardPanel } from '../webview/dashboardPanel';
 import * as path from 'path';
 
+const CLOUD_DASHBOARD_URL = 'https://dev-activity-tracker-zeta.vercel.app/dashboard';
+
 export function registerCommands(
   context: vscode.ExtensionContext,
   dbService: DatabaseService,
@@ -16,13 +18,13 @@ export function registerCommands(
       // Show internal webview
       DashboardPanel.createOrShow(context.extensionUri, dbService, tracker);
 
-      // Offer to open the premium React web client dashboard
+      // Offer to open the hosted cloud dashboard. The local VS Code dashboard stays available offline.
       const action = await vscode.window.showInformationMessage(
-        'Opening activity dashboard inside VS Code. Would you like to view the premium interactive web dashboard in your browser?',
-        'Open in Browser'
+        'Opening the offline VS Code dashboard. Sign in to the hosted dashboard to sync and review cloud analytics.',
+        'Open Cloud Dashboard'
       );
-      if (action === 'Open in Browser') {
-        vscode.env.openExternal(vscode.Uri.parse('http://localhost:5173/dashboard'));
+      if (action === 'Open Cloud Dashboard') {
+        vscode.env.openExternal(vscode.Uri.parse(CLOUD_DASHBOARD_URL));
       }
     }
   );
@@ -95,11 +97,11 @@ export function registerCommands(
     'dev-activity-tracker.syncToCloud',
     async () => {
       const action = await vscode.window.showInformationMessage(
-        'Cloud synchronization is now driven directly by your browser dashboard for security. Would you like to open the web dashboard to sync?',
+        'Cloud sync is handled by the hosted dashboard. Sign in, copy your UUID into VS Code settings, then sync from the dashboard.',
         'Open Dashboard'
       );
       if (action === 'Open Dashboard') {
-        vscode.env.openExternal(vscode.Uri.parse('http://localhost:5173/dashboard?tab=settings'));
+        vscode.env.openExternal(vscode.Uri.parse(`${CLOUD_DASHBOARD_URL}?tab=settings`));
       }
     }
   );

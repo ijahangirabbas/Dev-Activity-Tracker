@@ -4,25 +4,39 @@ import { DatabaseService } from '../storage/database';
 
 export class LocalServer {
   private server: http.Server | undefined;
-  private dbService: DatabaseService;
   private getLiveDatabase: () => any;
   private port: number = 54321;
+  private readonly allowedOrigins = new Set([
+    'https://dev-activity-tracker-zeta.vercel.app',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ]);
 
-  constructor(dbService: DatabaseService, getLiveDatabase: () => any) {
-    this.dbService = dbService;
+  constructor(_dbService: DatabaseService, getLiveDatabase: () => any) {
     this.getLiveDatabase = getLiveDatabase;
   }
 
   public start(): void {
     this.server = http.createServer((req, res) => {
-      // CORS headers allowing browser connections
-      res.setHeader('Access-Control-Allow-Origin', '*');
+      const origin = req.headers.origin;
+      const isAllowedOrigin = !origin || this.allowedOrigins.has(origin);
+
+      if (origin && isAllowedOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+      }
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
       if (req.method === 'OPTIONS') {
-        res.writeHead(204);
+        res.writeHead(isAllowedOrigin ? 204 : 403);
         res.end();
+        return;
+      }
+
+      if (!isAllowedOrigin) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Origin not allowed' }));
         return;
       }
 
@@ -91,8 +105,8 @@ export class LocalServer {
       }
     });
 
-    this.server.listen(this.port, () => {
-      console.log(`Local activity tracker API server running on http://localhost:${this.port}`);
+    this.server.listen(this.port, '127.0.0.1', () => {
+      console.log(`Local activity tracker API server running on http://127.0.0.1:${this.port}`);
     });
   }
 

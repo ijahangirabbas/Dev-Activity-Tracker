@@ -20,7 +20,6 @@ export class Tracker {
   private workspaceTracker: WorkspaceTracker;
   private fileTracker: FileTracker;
   private aiTracker: AITracker;
-  private supabaseSync: SupabaseSyncService | undefined;
 
   private disposables: vscode.Disposable[] = [];
   private tickInterval: NodeJS.Timeout | undefined;
@@ -144,44 +143,45 @@ export class Tracker {
         this.recordActivity('debugging');
       }),
 
-      // Testing events (safe check for proposed testObserver/testResults APIs)
-      (() => {
-        try {
-          if (typeof vscode.tests !== 'undefined' && 'onDidChangeTestResults' in vscode.tests) {
-            this.disposables.push(
-              vscode.tests.onDidChangeTestResults(() => {
-                this.lastTestingTime = Date.now();
-                const testsNamespace = vscode.tests as any;
-                if (testsNamespace.testResults && testsNamespace.testResults.length > 0) {
-                  const latest = testsNamespace.testResults[0];
-                  let failed = 0;
-                  const countFailed = (tasks: readonly any[]) => {
-                    for (const t of tasks) {
-                      if (t.taskStates) {
-                        for (const ts of t.taskStates) {
-                          if (ts.state === 'Failed' || ts.state === 'Errored') {
-                            failed++;
-                          }
-                        }
+    );
+
+    this.registerTestResultListener();
+  }
+
+  private registerTestResultListener(): void {
+    try {
+      const testsNamespace = vscode.tests as any;
+      if (testsNamespace && typeof testsNamespace.onDidChangeTestResults === 'function') {
+        this.disposables.push(
+          testsNamespace.onDidChangeTestResults(() => {
+            this.lastTestingTime = Date.now();
+            if (testsNamespace.testResults && testsNamespace.testResults.length > 0) {
+              const latest = testsNamespace.testResults[0];
+              let failed = 0;
+              const countFailed = (tasks: readonly any[]) => {
+                for (const t of tasks) {
+                  if (t.taskStates) {
+                    for (const ts of t.taskStates) {
+                      if (ts.state === 'Failed' || ts.state === 'Errored') {
+                        failed++;
                       }
                     }
-                  };
-                  countFailed(latest.results || []);
-                  this.sessionManager.recordTestRun(failed === 0);
-                  this.recordActivity('testing');
-                } else {
-                  // Fallback: just record test activity without pass/fail analysis if testResults is blocked
-                  this.sessionManager.recordTestRun(true);
-                  this.recordActivity('testing');
+                  }
                 }
-              })
-            );
-          }
-        } catch (e) {
-          console.error('Error starting Test tracker:', e);
-        }
-      })()
-    );
+              };
+              countFailed(latest.results || []);
+              this.sessionManager.recordTestRun(failed === 0);
+              this.recordActivity('testing');
+            } else {
+              this.sessionManager.recordTestRun(true);
+              this.recordActivity('testing');
+            }
+          })
+        );
+      }
+    } catch (e) {
+      console.error('Error starting Test tracker:', e);
+    }
   }
 
   private recordActivity(type: 'coding' | 'reading' | 'debugging' | 'terminal' | 'git' | 'testing' | 'ai') {

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { DatabaseSchema, DevSession, ProjectStats, DailyProgress, StreakStats } from '../models/types';
+import { DatabaseSchema, DevSession, StreakStats } from '../models/types';
 
 export class DatabaseService {
   private dbPath: string;

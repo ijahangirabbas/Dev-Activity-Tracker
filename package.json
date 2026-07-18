@@ -2,7 +2,7 @@
   "name": "dev-activity-tracker",
   "displayName": "Developer Activity & Coding Analytics",
   "description": "Automatically tracks coding, reading, debugging, git operations, and terminal usage with local-first detailed analytics and a premium interactive dashboard.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "jeem-labs",
   "icon": "icon.png",
   "keywords": [
@@ -107,7 +107,7 @@
         "devActivityTracker.userId": {
           "type": "string",
           "default": "",
-          "description": "Your Auth user ID (UUID) for syncing with the cloud dashboard."
+          "description": "Your cloud dashboard user UUID. Copy it from https://dev-activity-tracker-zeta.vercel.app/dashboard?tab=settings to sync local extension data to your account."
         }
       }
     }
@@ -116,7 +116,8 @@
     "vscode:prepublish": "npm run package",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "node esbuild.js --production"
+    "typecheck": "tsc --noEmit",
+    "package": "npm run typecheck && node esbuild.js --production"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

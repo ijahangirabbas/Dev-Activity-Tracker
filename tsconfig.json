@@ -20,6 +20,11 @@
   },
   "exclude": [
     "node_modules",
+    "web",
+    "src/tests",
     ".vscode-test"
+  ],
+  "include": [
+    "src/**/*.ts"
   ]
 }

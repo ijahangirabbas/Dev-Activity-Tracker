@@ -1,31 +1,42 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from 'web/components/AuthProvider';
-import { Copy, Check, ShieldAlert, Key, Link2, Sparkles, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  CircleDot,
+  ClipboardCheck,
+  Cloud,
+  Copy,
+  Key,
+  Link2,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [isLocalOnline, setIsLocalOnline] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string>('Not checked yet');
 
   const userId = user?.id || '';
 
-  // Load autoSync setting from localStorage on mount
+  const checkLocal = async () => {
+    try {
+      const res = await fetch('http://localhost:54321/api/data');
+      setIsLocalOnline(res.ok);
+    } catch (e) {
+      setIsLocalOnline(false);
+    } finally {
+      setLastChecked(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
+
   useEffect(() => {
     const savedAutoSync = localStorage.getItem('dev_tracker_auto_sync') !== 'false';
     setAutoSync(savedAutoSync);
-
-    // Check local server
-    const checkLocal = async () => {
-      try {
-        const res = await fetch('http://localhost:54321/api/data');
-        setIsLocalOnline(res.ok);
-      } catch (e) {
-        setIsLocalOnline(false);
-      }
-    };
     checkLocal();
   }, []);
 
@@ -34,128 +45,143 @@ export default function SettingsPage() {
     localStorage.setItem('dev_tracker_auto_sync', checked ? 'true' : 'false');
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   return (
-    <div className="space-y-8 py-2">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-text-primary">Sync & Integration Settings</h1>
-        <p className="text-xs text-text-secondary mt-1">Configure connection between VS Code and your personal cloud profile</p>
+    <div className="space-y-6 py-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-text-primary">Connect VS Code</h1>
+          <p className="text-xs text-text-secondary mt-1">
+            Copy your UUID into the extension. That is the only cloud identifier v1.0.1 needs.
+          </p>
+        </div>
+        <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-accent-green/20 bg-accent-green/10 px-3 py-2 text-xs font-bold text-accent-green">
+          <ShieldCheck size={14} />
+          No service-role key required
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Side: Credentials and Preferences */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* User ID block */}
-          <div className="p-6 rounded-2xl glass-card relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-text-primary">Your Cloud Credentials</h3>
-                <p className="text-xs text-text-secondary mt-1">Use this ID to pair your local VS Code extension</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
-                <Key size={16} />
-              </div>
+      <section className="rounded-lg border border-accent-primary/20 bg-accent-primary/10 p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-accent-primary/25 bg-accent-primary/10 text-accent-primary">
+              <Key size={20} />
             </div>
-
-            <div className="space-y-4">
-              {/* User ID */}
-              <div>
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">User Connection Key (UUID)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={userId}
-                    className="flex-1 bg-card-bg/60 border border-border-default rounded-xl px-4 py-3 text-xs font-mono text-text-primary focus:outline-none select-all"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(userId)}
-                    className="px-4 py-3 rounded-xl glass-card border border-border-default hover:bg-card-hover-bg/60 text-text-secondary active:scale-95 transition cursor-pointer shrink-0"
-                  >
-                    {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
-                  </button>
-                </div>
-              </div>
+            <div>
+              <h2 className="text-base font-bold text-text-primary">Your User Connection UUID</h2>
+              <p className="mt-1 text-xs leading-5 text-text-secondary">
+                Paste this value into VS Code setting <span className="font-mono text-accent-primary">devActivityTracker.userId</span>.
+              </p>
             </div>
           </div>
 
-          {/* Cloud Sync Preferences */}
-          <div className="p-6 rounded-2xl glass-card">
-            <h3 className="text-sm font-bold text-text-primary mb-4">Synchronization Preferences</h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-card-hover-bg/30 border border-border-default">
-                <div>
-                  <h4 className="text-xs font-bold text-text-primary">Auto-Sync to Cloud</h4>
-                  <p className="text-[10px] text-text-secondary mt-0.5">Automatically sync local sessions when dashboard is open</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={autoSync} 
-                    onChange={(e) => handleAutoSyncToggle(e.target.checked)} 
-                    className="sr-only peer" 
-                  />
-                  <div className="w-9 h-5 bg-border-default rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-primary" />
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-xl bg-card-hover-bg/30 border border-border-default">
-                <div>
-                  <h4 className="text-xs font-bold text-text-primary">Connection Status</h4>
-                  <p className="text-[10px] text-text-secondary mt-0.5">Communication link with localhost tracker server</p>
-                </div>
-                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
-                  isLocalOnline 
-                    ? 'bg-accent-green/10 border-accent-green/20 text-accent-green' 
-                    : 'bg-accent-amber/10 border-accent-amber/20 text-accent-amber'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isLocalOnline ? 'bg-accent-green' : 'bg-accent-amber'}`} />
-                  <span>{isLocalOnline ? 'Online' : 'Offline / Idle'}</span>
-                </div>
-              </div>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="min-w-0 rounded-lg border border-border-default bg-canvas px-3 py-3 font-mono text-xs text-text-primary">
+              {userId || 'Sign in to generate UUID'}
             </div>
+            <button
+              onClick={() => copyToClipboard(userId)}
+              disabled={!userId}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-primary px-4 py-3 text-xs font-bold text-white transition hover:bg-accent-primary-hover disabled:opacity-60"
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied' : 'Copy UUID'}
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Right Side: Setup Instructions */}
-        <div className="lg:col-span-1 p-6 rounded-2xl glass-card space-y-6">
-          <div className="flex items-center gap-3 border-b border-border-default pb-4 mb-4">
-            <div className="p-2 rounded-lg bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section className="lg:col-span-2 rounded-lg border border-border-default bg-card-bg p-5">
+          <div className="flex items-center justify-between gap-4 border-b border-border-default pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-text-primary">Sync Preferences</h2>
+              <p className="mt-1 text-xs text-text-secondary">Cloud sync runs from the dashboard when local VS Code data is reachable.</p>
+            </div>
+            <Cloud size={18} className="text-accent-primary" />
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center justify-between rounded-lg border border-border-default bg-card-hover-bg/25 p-4">
+              <div>
+                <h3 className="text-xs font-bold text-text-primary">Auto-sync while dashboard is open</h3>
+                <p className="mt-1 text-[11px] text-text-secondary">Uploads missing local sessions to your signed-in Supabase account.</p>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={autoSync}
+                  onChange={(e) => handleAutoSyncToggle(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <div className="h-5 w-9 rounded-full bg-border-default after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent-primary peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-border-default bg-card-hover-bg/25 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-text-primary">VS Code local bridge</h3>
+                <p className="mt-1 text-[11px] text-text-secondary">Last checked at {lastChecked}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${
+                  isLocalOnline
+                    ? 'border-accent-green/20 bg-accent-green/10 text-accent-green'
+                    : 'border-accent-amber/20 bg-accent-amber/10 text-accent-amber'
+                }`}>
+                  <CircleDot size={12} />
+                  {isLocalOnline ? 'Local Live' : 'VS Code Offline'}
+                </div>
+                <button
+                  type="button"
+                  onClick={checkLocal}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-xs font-bold text-text-primary transition hover:bg-card-hover-bg"
+                >
+                  <RefreshCw size={13} />
+                  Check
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="rounded-lg border border-border-default bg-card-bg p-5">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent-primary/20 bg-accent-primary/10 text-accent-primary">
               <Link2 size={16} />
             </div>
-            <h3 className="text-sm font-bold text-text-primary">Setup Instructions</h3>
+            <h2 className="text-sm font-bold text-text-primary">Setup Steps</h2>
           </div>
 
-          <div className="space-y-4 text-xs text-text-secondary leading-relaxed">
-            <div className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">1</span>
-              <span>Open your VS Code Settings using shortcut <kbd className="px-1 py-0.5 bg-canvas border border-border-default rounded text-[9px]">Ctrl + ,</kbd> or <kbd className="px-1 py-0.5 bg-canvas border border-border-default rounded text-[9px]">Cmd + ,</kbd>.</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">2</span>
-              <span>Search for **&quot;Developer Activity&quot;** configurations.</span>
-            </div>
-            <div className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">3</span>
-              <div className="space-y-1">
-                <span>Copy and paste your **User Connection Key** from this page into:</span>
-                <div className="font-mono text-[10px] text-accent-primary bg-card-bg/60 border border-border-default rounded-lg px-2 py-1.5 mt-1 block">
-                  devActivityTracker.userId
-                </div>
+          <div className="space-y-4">
+            {[
+              ['1', 'Open VS Code Settings and search Developer Activity.'],
+              ['2', 'Paste your UUID into devActivityTracker.userId.'],
+              ['3', 'Keep coding locally. The offline VS Code dashboard still works.'],
+              ['4', 'Open this dashboard and use Sync Now when Local Live is available.'],
+            ].map(([step, text]) => (
+              <div key={step} className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-accent-primary/20 bg-accent-primary/10 text-xs font-bold text-accent-primary">
+                  {step}
+                </span>
+                <p className="text-xs leading-5 text-text-secondary">{text}</p>
               </div>
-            </div>
-            <div className="flex gap-3">
-              <span className="w-5 h-5 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center font-bold text-accent-primary shrink-0 select-none">4</span>
-              <span>Your local code tracking sessions will now sync to this cloud dashboard automatically in the background when it is open!</span>
-            </div>
+            ))}
           </div>
-        </div>
+
+          <div className="mt-6 rounded-lg border border-border-default bg-canvas p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-text-primary">
+              <ClipboardCheck size={14} className="text-accent-green" />
+              Field to update
+            </div>
+            <div className="font-mono text-[11px] text-accent-primary">devActivityTracker.userId</div>
+          </div>
+        </aside>
       </div>
     </div>
   );

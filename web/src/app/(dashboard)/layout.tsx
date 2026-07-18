@@ -18,7 +18,8 @@ import {
   Command,
   Loader2,
   Cloud,
-  CloudOff,
+  Copy,
+  Check,
   RefreshCw
 } from 'lucide-react';
 import { syncLocalDataToCloud } from 'web/lib/syncService';
@@ -39,6 +40,13 @@ export default function DashboardLayout() {
   const [isLocalOnline, setIsLocalOnline] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [copiedUserId, setCopiedUserId] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/signin?next=/dashboard', { replace: true });
+    }
+  }, [isLoading, navigate, user]);
 
   // Monitor connection to the VS Code local API server
   useEffect(() => {
@@ -90,6 +98,13 @@ export default function DashboardLayout() {
     }
   };
 
+  const copyUserId = async () => {
+    if (!user?.id) return;
+    await navigator.clipboard.writeText(user.id);
+    setCopiedUserId(true);
+    setTimeout(() => setCopiedUserId(false), 1800);
+  };
+
   // Set default theme from localStorage on component mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -128,7 +143,9 @@ export default function DashboardLayout() {
         <div className="noise-overlay" />
         <div className="flex flex-col items-center gap-4 relative z-10">
           <Loader2 size={36} className="animate-spin text-accent-primary" />
-          <p className="text-sm text-text-secondary font-medium animate-pulse">Authorizing secure workspace...</p>
+          <p className="text-sm text-text-secondary font-medium animate-pulse">
+            {isLoading ? 'Authorizing secure workspace...' : 'Redirecting to sign in...'}
+          </p>
         </div>
       </div>
     );
@@ -281,6 +298,40 @@ export default function DashboardLayout() {
 
         {/* Page Inner Container */}
         <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto relative z-10">
+          <section className="mb-6 rounded-lg border border-border-default bg-card-bg p-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                isLocalOnline
+                  ? 'border-accent-green/25 bg-accent-green/10 text-accent-green'
+                  : 'border-border-default bg-card-hover-bg/40 text-text-secondary'
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isLocalOnline ? 'bg-accent-green' : 'bg-text-muted'}`} />
+                {isLocalOnline ? 'Local Live' : 'VS Code Offline'}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-accent-primary/20 bg-accent-primary/10 px-3 py-1.5 text-xs font-semibold text-accent-primary">
+                <Cloud size={13} />
+                Cloud Dashboard
+              </span>
+              <span className="inline-flex items-center rounded-lg border border-border-default bg-card-hover-bg/30 px-3 py-1.5 text-xs font-semibold text-text-secondary">
+                UUID only, no service key
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="min-w-0 rounded-lg border border-border-default bg-canvas px-3 py-2 font-mono text-[11px] text-text-secondary">
+                <span className="mr-2 text-text-muted">devActivityTracker.userId</span>
+                <span className="text-text-primary">{user.id}</span>
+              </div>
+              <button
+                type="button"
+                onClick={copyUserId}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border-default bg-card-hover-bg/40 px-3 py-2 text-xs font-bold text-text-primary transition hover:bg-card-hover-bg"
+              >
+                {copiedUserId ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                {copiedUserId ? 'Copied' : 'Copy UUID'}
+              </button>
+            </div>
+          </section>
           {activeTab === 'overview' && <OverviewPage />}
           {activeTab === 'projects' && <ProjectsPage />}
           {activeTab === 'files' && <FilesPage />}

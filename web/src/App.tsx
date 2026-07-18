@@ -10,12 +10,8 @@ import SignupPage from 'web/app/(auth)/signup/page';
 import ForgotPasswordPage from 'web/app/(auth)/forgot-password/page';
 import ResetPasswordPage from 'web/app/(auth)/reset-password/page';
 import PaymentPage from 'web/app/payment/page';
+import ContributePage from 'web/app/contribute/page';
 import DashboardLayout from 'web/app/(dashboard)/layout';
-import OverviewPage from 'web/app/(dashboard)/dashboard/page';
-import ProjectsPage from 'web/app/(dashboard)/projects/page';
-import FilesPage from 'web/app/(dashboard)/files/page';
-import TerminalsPage from 'web/app/(dashboard)/terminals/page';
-import SettingsPage from 'web/app/(dashboard)/settings/page';
 import AuthCallback from 'web/components/AuthCallback';
 
 export default function App() {
@@ -26,8 +22,10 @@ export default function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Home />} />
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signin" element={<LoginPage />} />
+            <Route path="/login" element={<Navigate to="/signin" replace />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/contribute" element={<ContributePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/payment" element={<PaymentPage />} />

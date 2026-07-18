@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseService } from '../storage/database';
 import { Tracker } from '../tracking/tracker';
-import { ExtensionConfig } from '../models/types';
+import { DatabaseSchema, ExtensionConfig } from '../models/types';
 
 export class DashboardPanel {
   public static currentPanel: DashboardPanel | undefined;
@@ -148,7 +148,7 @@ export class DashboardPanel {
         let content = '';
 
         if (ext === '.json') {
-          content = JSON.stringify(this.dbService.getDatabase(), null, 2);
+          content = JSON.stringify(this.tracker.getLiveDatabase(), null, 2);
         } else if (ext === '.csv') {
           content = this.generateCSVContent();
         } else {
@@ -164,7 +164,7 @@ export class DashboardPanel {
   }
 
   private generateCSVContent(): string {
-    const db = this.dbService.getDatabase();
+    const db: DatabaseSchema = this.tracker.getLiveDatabase();
     let csv = 'Date,Development Time (Seconds),Coding Time (Seconds),Goal (Seconds),Sessions Count,Commits Count,Terminal Time,AI Time\n';
     
     for (const [date, progress] of Object.entries(db.dailyProgress)) {
@@ -174,7 +174,7 @@ export class DashboardPanel {
   }
 
   private generateMarkdownContent(range: string): string {
-    const db = this.dbService.getDatabase();
+    const db: DatabaseSchema = this.tracker.getLiveDatabase();
     let md = `# Developer Activity Productivity Report\n\n`;
     md += `*Generated on: ${new Date().toLocaleString()}*\n`;
     md += `*Filtered Range: ${range.toUpperCase()}*\n\n`;

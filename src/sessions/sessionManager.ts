@@ -1,4 +1,4 @@
-import { DevSession, FileStats, TimelineEvent, TerminalCommandEvent } from '../models/types';
+import { DevSession, TimelineEvent, TerminalCommandEvent } from '../models/types';
 
 export class SessionManager {
   private currentSession: DevSession | null = null;
