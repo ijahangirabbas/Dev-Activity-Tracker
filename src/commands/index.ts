@@ -13,25 +13,26 @@ export function registerCommands(
 ) {
   // Command: Show Dashboard
   const showDashboard = vscode.commands.registerCommand(
-    'dev-activity-tracker.showDashboard',
+    'devtracker.showDashboard',
     async () => {
       // Show internal webview
       DashboardPanel.createOrShow(context.extensionUri, dbService, tracker);
 
       // Offer to open the hosted cloud dashboard. The local VS Code dashboard stays available offline.
       const action = await vscode.window.showInformationMessage(
-        'Opening the offline VS Code dashboard. Sign in to the hosted dashboard to sync and review cloud analytics.',
+        'Opening the offline DevTracker dashboard. Sign in to the hosted dashboard to sync and review cloud analytics.',
         'Open Cloud Dashboard'
       );
       if (action === 'Open Cloud Dashboard') {
-        vscode.env.openExternal(vscode.Uri.parse(CLOUD_DASHBOARD_URL));
+        const token = await context.secrets.get('devTracker.bridgeToken') || '';
+        vscode.env.openExternal(vscode.Uri.parse(`${CLOUD_DASHBOARD_URL}?token=${token}`));
       }
     }
   );
 
   // Command: Export Data (if dashboard is open, uses dashboard export logic)
   const exportData = vscode.commands.registerCommand(
-    'dev-activity-tracker.exportData',
+    'devtracker.exportData',
     () => {
       if (DashboardPanel.currentPanel) {
         vscode.window.showInformationMessage('Triggering export from dashboard...');
@@ -44,7 +45,7 @@ export function registerCommands(
 
   // Command: Backup Data
   const backupData = vscode.commands.registerCommand(
-    'dev-activity-tracker.backupData',
+    'devtracker.backupData',
     () => {
       try {
         const backupPath = dbService.backup();
@@ -57,7 +58,7 @@ export function registerCommands(
 
   // Command: Restore Data
   const restoreData = vscode.commands.registerCommand(
-    'dev-activity-tracker.restoreData',
+    'devtracker.restoreData',
     async () => {
       try {
         const options: vscode.OpenDialogOptions = {
@@ -94,17 +95,72 @@ export function registerCommands(
 
   // Command: Sync to Cloud (Supabase)
   const syncToCloud = vscode.commands.registerCommand(
-    'dev-activity-tracker.syncToCloud',
+    'devtracker.syncToCloud',
     async () => {
       const action = await vscode.window.showInformationMessage(
         'Cloud sync is handled by the hosted dashboard. Sign in, copy your UUID into VS Code settings, then sync from the dashboard.',
         'Open Dashboard'
       );
       if (action === 'Open Dashboard') {
-        vscode.env.openExternal(vscode.Uri.parse(`${CLOUD_DASHBOARD_URL}?tab=settings`));
+        const token = await context.secrets.get('devTracker.bridgeToken') || '';
+        vscode.env.openExternal(vscode.Uri.parse(`${CLOUD_DASHBOARD_URL}?tab=settings&token=${token}`));
       }
     }
   );
 
-  context.subscriptions.push(showDashboard, exportData, backupData, restoreData, syncToCloud);
+  // Command: Pause Tracking
+  const pauseTracking = vscode.commands.registerCommand(
+    'devtracker.pauseTracking',
+    () => {
+      tracker.pause();
+      vscode.window.showInformationMessage('DevTracker: Tracking paused.');
+    }
+  );
+
+  // Command: Resume Tracking
+  const resumeTracking = vscode.commands.registerCommand(
+    'devtracker.resumeTracking',
+    () => {
+      tracker.resume();
+      vscode.window.showInformationMessage('DevTracker: Tracking resumed.');
+    }
+  );
+
+  // Command: Re-sanitize History
+  const reSanitizeHistory = vscode.commands.registerCommand(
+    'devtracker.reSanitizeHistory',
+    async () => {
+      const selection = await vscode.window.showWarningMessage(
+        'Re-sanitizing your history will rewrite all past sessions using your current Privacy Mode settings. A backup will be created first. Proceed?',
+        'Yes, Sanitize',
+        'Cancel'
+      );
+      if (selection === 'Yes, Sanitize') {
+        try {
+          const config = vscode.workspace.getConfiguration('devTracker');
+          const privacyMode = config.get<boolean>('privacyMode') || false;
+          const recordRaw = config.get<boolean>('recordRawTerminalCommands') || false;
+          
+          const backupPath = dbService.reSanitizeHistory(privacyMode, recordRaw);
+          vscode.window.showInformationMessage(`History re-sanitized successfully! Backup saved to: ${path.basename(backupPath)}`);
+          if (DashboardPanel.currentPanel) {
+            DashboardPanel.currentPanel.update();
+          }
+        } catch (e) {
+          vscode.window.showErrorMessage('Failed to re-sanitize history.');
+        }
+      }
+    }
+  );
+
+  context.subscriptions.push(
+    showDashboard,
+    exportData,
+    backupData,
+    restoreData,
+    syncToCloud,
+    pauseTracking,
+    resumeTracking,
+    reSanitizeHistory
+  );
 }

@@ -8,6 +8,7 @@ let lastLocalCheckTime = 0;
 
 // Helper to trigger background sync if auto-sync is enabled
 let isSyncingInProgress = false;
+let lastSettings: any = null;
 
 export function triggerBackgroundSync(localDb: any) {
   if (isSyncingInProgress) return;
@@ -15,7 +16,7 @@ export function triggerBackgroundSync(localDb: any) {
   if (!isAutoSyncEnabled) return;
 
   isSyncingInProgress = true;
-  syncLocalDataToCloud(localDb)
+  syncLocalDataToCloud(localDb, lastSettings?.privacyMode)
     .then((result) => {
       if (result.success && result.syncedSessionsCount > 0) {
         console.log(`[SyncEngine] Automatically synced ${result.syncedSessionsCount} sessions to cloud.`);
@@ -42,7 +43,8 @@ async function fetchLocalData(): Promise<any> {
   const timeoutId = setTimeout(() => controller.abort(), 250);
 
   try {
-    const res = await fetch('http://localhost:54321/api/data', {
+    const token = localStorage.getItem('dev_tracker_bridge_token') || '';
+    const res = await fetch(`http://localhost:54321/api/data?token=${encodeURIComponent(token)}`, {
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -51,7 +53,9 @@ async function fetchLocalData(): Promise<any> {
     // Server is online
     isLocalServerOffline = false;
     lastLocalCheckTime = now;
-    return await res.json();
+    const data = await res.json();
+    lastSettings = data.settings;
+    return data;
   } catch (e) {
     clearTimeout(timeoutId);
     // Mark server as offline to fallback immediately on subsequent parallel query triggers

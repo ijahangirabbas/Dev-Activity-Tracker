@@ -37,6 +37,8 @@ export class Tracker {
 
   // Cached config — updated only on configuration change events
   private cachedConfig: ExtensionConfig;
+  private isPaused: boolean = false;
+  private lastVsCodeInteractionTime: number = Date.now();
 
   private onStateChangedCallback?: (state: string, elapsedToday: number) => void;
 
@@ -77,11 +79,12 @@ export class Tracker {
 
   // Read config from VS Code settings (called sparingly)
   private readConfig(): ExtensionConfig {
-    const config = vscode.workspace.getConfiguration('devActivityTracker');
+    const config = vscode.workspace.getConfiguration('devTracker');
     return {
       idleTimeout: config.get<number>('idleTimeout') || 300,
       dailyGoal: config.get<number>('dailyGoal') || 14400,
       privacyMode: config.get<boolean>('privacyMode') || false,
+      recordRawTerminalCommands: config.get<boolean>('recordRawTerminalCommands') || false,
       showStatusBar: config.get<boolean>('showStatusBar') || true,
       userId: config.get<string>('userId') || ''
     };
@@ -185,7 +188,9 @@ export class Tracker {
   }
 
   private recordActivity(type: 'coding' | 'reading' | 'debugging' | 'terminal' | 'git' | 'testing' | 'ai') {
+    if (this.isPaused) return;
     const now = Date.now();
+    this.lastVsCodeInteractionTime = now;
     this.idleDetector.recordActivity();
 
     switch (type) {
@@ -221,15 +226,48 @@ export class Tracker {
 
   private handleGitBranchChange(branch: string) {
     this.lastGitTime = Date.now();
-    this.sessionManager.recordBranchSwitch(branch);
+    const branchName = this.cachedConfig.privacyMode ? `branch_${this.simpleHash(branch)}` : branch;
+    this.sessionManager.recordBranchSwitch(branchName);
     this.recordActivity('git');
     this.cycleSession();
   }
 
   private handleTerminalCommand(event: TerminalCommandEvent) {
     this.lastTerminalTime = Date.now();
-    this.sessionManager.recordTerminalCommand(event.command, event.category);
+    
+    // Privacy and secret redaction logic
+    let displayCommand = event.command;
+    displayCommand = this.redactSecrets(displayCommand);
+    
+    const shouldRecordRaw = this.cachedConfig.recordRawTerminalCommands && !this.cachedConfig.privacyMode;
+    if (!shouldRecordRaw) {
+      displayCommand = `[${event.category || 'command'}]`;
+    }
+    
+    this.sessionManager.recordTerminalCommand(displayCommand, event.category);
     this.recordActivity('terminal');
+  }
+
+  private redactSecrets(command: string): string {
+    // Redact assignments: token=xyz, pass=xyz, password=xyz, api_key=xyz, key=xyz, secret=xyz
+    let redacted = command.replace(/(token|pass|password|api_key|key|secret|credential|pwd)\s*=\s*[^\s"']+/gi, '$1=[REDACTED]');
+    redacted = redacted.replace(/(token|pass|password|api_key|key|secret|credential|pwd)\s*=\s*(["'])(.*?)\2/gi, '$1=$2[REDACTED]$2');
+    
+    // Redact flags: -p password, --password password, -token token, --token token, --api-key key
+    redacted = redacted.replace(/(-\w*p|--password|--token|--api-key|--secret|--key)\s+[^\s"']+/gi, '$1 [REDACTED]');
+    redacted = redacted.replace(/(-\w*p|--password|--token|--api-key|--secret|--key)\s+(["'])(.*?)\2/gi, '$1 $2[REDACTED]$2');
+    
+    return redacted;
+  }
+
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).slice(0, 6).toUpperCase();
   }
 
   private handleTerminalActivity() {
@@ -280,6 +318,10 @@ export class Tracker {
     const deltaSeconds = (now - this.lastTickTime) / 1000;
     this.lastTickTime = now;
 
+    if (this.isPaused) {
+      return;
+    }
+
     if (this.idleDetector.isIdle()) {
       return;
     }
@@ -314,6 +356,11 @@ export class Tracker {
       activeState = 'coding';
     }
 
+    // Interaction decay for fallback reading state
+    if (activeState === 'reading' && now - this.lastVsCodeInteractionTime > 60000) {
+      activeState = 'idle';
+    }
+
     // Accumulate times
     this.sessionManager.updateSessionTimes(activeState, deltaSeconds);
 
@@ -345,7 +392,7 @@ export class Tracker {
 
   private startNewSession() {
     const ws = this.workspaceTracker.getWorkspaceDetails(this.cachedConfig.privacyMode);
-    const gitDetails = this.gitTracker.getRepoDetails();
+    const gitDetails = this.gitTracker.getRepoDetails(this.cachedConfig.privacyMode);
     this.sessionManager.startSession(ws.name, ws.path, gitDetails.repository, gitDetails.branch);
     this.lastTickTime = Date.now();
     this.updateActiveSessionFile();
@@ -392,6 +439,7 @@ export class Tracker {
   }
 
   public getActiveState(): string {
+    if (this.isPaused) { return 'Paused'; }
     if (this.idleDetector.isIdle()) { return 'Idle'; }
     const now = Date.now();
     if (vscode.debug.activeDebugSession)        { return 'Debugging'; }
@@ -424,6 +472,32 @@ export class Tracker {
     }
     
     return this.dbService.getMergedLiveDatabase(activeSessions, this.cachedConfig.dailyGoal);
+  }
+
+  public pause(): void {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    this.endCurrentSession();
+    
+    // Notify status bar
+    if (this.onStateChangedCallback) {
+      this.onStateChangedCallback('Paused', this.getTodayAccumulatedTime());
+    }
+  }
+
+  public resume(): void {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    this.startNewSession();
+    
+    // Notify status bar
+    if (this.onStateChangedCallback) {
+      this.onStateChangedCallback(this.getActiveState() || 'Reading', this.getTodayAccumulatedTime());
+    }
+  }
+
+  public getPausedState(): boolean {
+    return this.isPaused;
   }
 
   public deactivate() {

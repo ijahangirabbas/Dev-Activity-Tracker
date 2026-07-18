@@ -506,6 +506,147 @@ export class DatabaseService {
     }
   }
 
+  public reSanitizeHistory(privacyMode: boolean, recordRaw: boolean): string {
+    const backupPath = this.backup();
+
+    this.db.sessions = this.db.sessions.map(session => {
+      // 1. Obfuscate session fields under privacy mode
+      let workspaceName = session.workspaceName;
+      let workspacePathVal = session.workspacePath;
+      let repository = session.repository;
+      let branch = session.branch;
+
+      if (privacyMode) {
+        if (workspaceName && workspaceName !== 'No Workspace') {
+          workspaceName = `Project_${this.simpleHash(workspaceName)}`;
+        }
+        if (workspacePathVal) {
+          workspacePathVal = `C:\\private\\Project_${this.simpleHash(workspaceName)}`;
+        }
+        if (repository) {
+          repository = `repo_${this.simpleHash(repository)}`;
+        }
+        if (branch) {
+          branch = `branch_${this.simpleHash(branch)}`;
+        }
+      }
+
+      // 2. Obfuscate files under privacy mode
+      let files = session.files;
+      if (privacyMode && files) {
+        const newFiles: Record<string, any> = {};
+        for (const [relPath, stats] of Object.entries(files)) {
+          const parts = relPath.split(/[/\\]/);
+          const obscuredParts = parts.map((part, index) => {
+            if (index === parts.length - 1) {
+              const ext = path.extname(part);
+              const nameWithoutExt = path.basename(part, ext);
+              return `file_${this.simpleHash(nameWithoutExt)}${ext}`;
+            }
+            return `dir_${this.simpleHash(part)}`;
+          });
+          const newRelPath = obscuredParts.join('/');
+          const newFileName = obscuredParts[obscuredParts.length - 1];
+          
+          newFiles[newRelPath] = {
+            ...stats,
+            fileName: newFileName,
+            relativePath: newRelPath
+          };
+        }
+        files = newFiles;
+      }
+
+      // 3. Obfuscate terminal commands
+      let terminalCommands = session.terminalCommands;
+      if (terminalCommands) {
+        terminalCommands = terminalCommands.map(cmd => {
+          let cleanCmd = this.redactSecrets(cmd.command);
+          if (!recordRaw || privacyMode) {
+            cleanCmd = `[${cmd.category || 'command'}]`;
+          }
+          return {
+            ...cmd,
+            command: cleanCmd
+          };
+        });
+      }
+
+      // 4. Obfuscate timeline descriptions
+      let timeline = session.timeline;
+      if (timeline) {
+        timeline = timeline.map(evt => {
+          let desc = evt.description;
+          if (privacyMode) {
+            if (desc.startsWith('Saved file: ')) {
+              const filePart = desc.substring(12);
+              const ext = path.extname(filePart);
+              const base = path.basename(filePart, ext);
+              desc = `Saved file: file_${this.simpleHash(base)}${ext}`;
+            } else if (desc.startsWith('Opened file: ')) {
+              const filePart = desc.substring(13);
+              const ext = path.extname(filePart);
+              const base = path.basename(filePart, ext);
+              desc = `Opened file: file_${this.simpleHash(base)}${ext}`;
+            } else if (desc.startsWith('Switched Git Branch to ')) {
+              const branchPart = desc.substring(23);
+              desc = `Switched Git Branch to branch_${this.simpleHash(branchPart)}`;
+            } else if (desc.startsWith('Executed Terminal Command: ')) {
+              desc = `Executed Terminal Command: [terminal]`;
+            }
+          } else {
+            if (desc.startsWith('Executed Terminal Command: ')) {
+              const cmdPart = desc.substring(27);
+              desc = `Executed Terminal Command: ${this.redactSecrets(cmdPart).slice(0, 30)}`;
+            }
+          }
+          return {
+            ...evt,
+            description: desc
+          };
+        });
+      }
+
+      return {
+        ...session,
+        workspaceName,
+        workspacePath: workspacePathVal,
+        repository,
+        branch,
+        files,
+        terminalCommands,
+        timeline
+      };
+    });
+
+    // Rebuild everything and save
+    this.rebuildAllStats();
+    this.save();
+
+    return backupPath;
+  }
+
+  private redactSecrets(command: string): string {
+    let redacted = command.replace(/(token|pass|password|api_key|key|secret|credential|pwd)\s*=\s*[^\s"']+/gi, '$1=[REDACTED]');
+    redacted = redacted.replace(/(token|pass|password|api_key|key|secret|credential|pwd)\s*=\s*(["'])(.*?)\2/gi, '$1=$2[REDACTED]$2');
+    
+    redacted = redacted.replace(/(-\w*p|--password|--token|--api-key|--secret|--key)\s+[^\s"']+/gi, '$1 [REDACTED]');
+    redacted = redacted.replace(/(-\w*p|--password|--token|--api-key|--secret|--key)\s+(["'])(.*?)\2/gi, '$1 $2[REDACTED]$2');
+    
+    return redacted;
+  }
+
+  private simpleHash(str: string): string {
+    if (!str) return '';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).slice(0, 6).toUpperCase();
+  }
+
   public restore(backupPath: string): void {
     try {
       const raw = fs.readFileSync(backupPath, 'utf8');

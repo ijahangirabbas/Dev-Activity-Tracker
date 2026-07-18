@@ -57,7 +57,9 @@ export class SessionManager {
   public updateSessionTimes(activeCategory: string, deltaSeconds: number): void {
     if (!this.currentSession) { return; }
 
-    this.currentSession.duration += deltaSeconds;
+    if (activeCategory !== 'idle') {
+      this.currentSession.duration += deltaSeconds;
+    }
     this.currentSession.endTime = Date.now();
 
     switch (activeCategory) {

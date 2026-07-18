@@ -52,7 +52,8 @@ export default function DashboardLayout() {
   useEffect(() => {
     const checkLocalServer = async () => {
       try {
-        const res = await fetch('http://localhost:54321/api/data');
+        const token = localStorage.getItem('dev_tracker_bridge_token') || '';
+        const res = await fetch(`http://localhost:54321/api/data?token=${encodeURIComponent(token)}`);
         if (res.ok) {
           setIsLocalOnline(true);
         } else {
@@ -73,12 +74,13 @@ export default function DashboardLayout() {
     setIsSyncing(true);
     setSyncStatus('Connecting to local tracker...');
     try {
-      const res = await fetch('http://localhost:54321/api/data');
+      const token = localStorage.getItem('dev_tracker_bridge_token') || '';
+      const res = await fetch(`http://localhost:54321/api/data?token=${encodeURIComponent(token)}`);
       if (!res.ok) throw new Error('Local server offline');
       const data = await res.json();
       
       setSyncStatus('Syncing database...');
-      const result = await syncLocalDataToCloud(data.db);
+      const result = await syncLocalDataToCloud(data.db, data.settings?.privacyMode);
       if (result.success) {
         setSyncStatus(`Synced!`);
         setTimeout(() => setSyncStatus(null), 2500);
@@ -185,7 +187,7 @@ export default function DashboardLayout() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-accent-primary to-accent-purple flex items-center justify-center transition-transform group-hover:scale-105 duration-300">
               <Sparkles size={16} className="text-white" />
             </div>
-            <span className="font-extrabold text-sm tracking-wider uppercase text-text-primary">Dev Tracker</span>
+            <span className="font-extrabold text-sm tracking-wider uppercase text-text-primary">DevTracker</span>
           </Link>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-text-secondary hover:text-text-primary">
             <X size={20} />
@@ -319,7 +321,7 @@ export default function DashboardLayout() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="min-w-0 rounded-lg border border-border-default bg-canvas px-3 py-2 font-mono text-[11px] text-text-secondary">
-                <span className="mr-2 text-text-muted">devActivityTracker.userId</span>
+                <span className="mr-2 text-text-muted">devTracker.userId</span>
                 <span className="text-text-primary">{user.id}</span>
               </div>
               <button

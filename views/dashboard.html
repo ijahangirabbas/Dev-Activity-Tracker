@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Developer Activity & Productivity Analytics</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} https: data:; script-src 'nonce-{{nonce}}' {{cspSource}}; style-src 'unsafe-inline' {{cspSource}};">
+  <title>DevTracker Analytics</title>
   <link rel="stylesheet" id="style-link" href="">
 </head>
 <body>
@@ -252,9 +253,8 @@
 
   <div class="tooltip" id="tooltip" style="display: none;"></div>
 
-  <script id="script-link" src=""></script>
-  <!-- Lucide Icons - Professional SVG icon library -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>if(typeof lucide !== 'undefined') lucide.createIcons();</script>
+  <script id="script-link" src="" nonce="{{nonce}}"></script>
+  <script id="lucide-link" src="" nonce="{{nonce}}"></script>
+  <script nonce="{{nonce}}">if(typeof lucide !== 'undefined') lucide.createIcons();</script>
 </body>
 </html>
